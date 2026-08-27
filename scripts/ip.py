@@ -291,6 +291,66 @@ def cmd_show(args):
     return 0
 
 
+def build_avatar(name, photo=None):
+    """由正面照母版生成形象头像 240×240 与形象图标 50×50（都透明）。"""
+    d = ip_dir(name)
+    src = photo or os.path.join(d, "ip.png")
+    fit = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fit_assets.py")
+    r = subprocess.run([sys.executable, fit, d, "--cover", src, "--icon", src],
+                       capture_output=True, text=True)
+    if r.returncode != 0:
+        print(f"⚠️  头像/图标生成失败：{r.stderr.strip()[:200]}", file=sys.stderr)
+        return
+    for tmp, dst in (("cover_240.png", f"形象头像-{name}.png"), ("icon_50.png", f"形象图标-{name}.png")):
+        p = os.path.join(d, tmp)
+        if os.path.exists(p):
+            os.replace(p, os.path.join(d, dst))
+            print(f"✓ {dst}")
+
+
+def cmd_update(args):
+    """换正面照母版并重做头像/图标 —— 原来那张抠得不好、或换了更合适的取景时用。"""
+    name = args.name
+    meta = load(name)
+    if not meta:
+        print(f"❌ 没有形象「{name}」", file=sys.stderr)
+        return 1
+    d = ip_dir(name)
+    if args.photo:
+        photo = os.path.expanduser(args.photo)
+        if not os.path.isfile(photo):
+            print(f"❌ 正面照不存在：{photo}", file=sys.stderr)
+            return 1
+        shutil.copy2(photo, os.path.join(d, "ip.png"))
+        meta["source"] = photo
+        print(f"✓ 正面照母版已换 → {d}/ip.png")
+        if args.rereverse:
+            rev = os.path.join(d, "ip-reverse.txt")
+            if shutil.which("museav"):
+                print("▶ 重新读图 ...")
+                with open(rev, "w", encoding="utf-8") as f:
+                    subprocess.run(["museav", "reverse", os.path.join(d, "ip.png")],
+                                   stdout=f, stderr=subprocess.DEVNULL, check=False)
+        build_avatar(name)
+    if args.desc:
+        if len(args.desc) > 80:
+            print(f"❌ 简介 {len(args.desc)} 字，超出 80 字上限", file=sys.stderr)
+            return 1
+        meta["desc"] = args.desc
+    if args.clear_todo:
+        meta["todo"] = []
+    for t in (args.todo or []):
+        meta.setdefault("todo", []).append(t)
+    save(name, meta)
+
+    clash = clash_check(name, avatar_of(name))
+    if clash:
+        print(f"⚠️  头像与已有形象 {'、'.join(clash)} 几乎相同 —— 官方要求不同形象不得用同一张头像",
+              file=sys.stderr)
+    print()
+    return cmd_show(args)
+
+
 def git(*a, **kw):
     return subprocess.run(["git", "-C", HOME, *a], capture_output=True, text=True, **kw)
 
@@ -402,6 +462,15 @@ def main():
     li.add_argument("name")
     li.add_argument("album")
     li.set_defaults(func=cmd_link)
+
+    up = sub.add_parser("update", help="换正面照母版 / 改简介 / 增删待办，并重做头像图标")
+    up.add_argument("name")
+    up.add_argument("--photo", help="新的正面照（建议正面半身或全身、透明背景、无文字装饰）")
+    up.add_argument("--desc", help="新简介，≤80 字")
+    up.add_argument("--todo", action="append", help="追加待办")
+    up.add_argument("--clear-todo", action="store_true", help="清空待办")
+    up.add_argument("--rereverse", action="store_true", help="换图后重新读图出 prompt")
+    up.set_defaults(func=cmd_update)
 
     sy = sub.add_parser("sync", help="备份形象库到私有 GitLab 仓库（首次自动建仓）")
     sy.add_argument("--remote", help="已有仓库的 git URL；不给则用 glab 建 wechat-sticker-ips")
