@@ -219,7 +219,7 @@ fi
 cat <<EOF
 
 ✅ 全部就绪。打开 $DIR/submit.md，照着表格在平台逐项填写。
-   平台入口：https://sticker.weixin.qq.com/
+   平台入口：https://sticker.weixin.qq.com/cgi-bin/mmemoticonwebnode-bin/pages/home
 EOF
 if [[ -n "$IP_NAME" ]]; then
   echo "   形象头像/图标（形象主页用，与专辑封面是不同字段）："

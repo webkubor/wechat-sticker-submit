@@ -217,6 +217,16 @@ python3 $SKILL_DIR/scripts/make_submit.py ~/Desktop/my-album   # new_album.sh �
 不传 `--copy album.yml` 时退回英文命名（`main_240/01.png`、`cover_240.png`…），
 机检与清单脚本两套都认。
 
+投稿入口（路径分两套 CGI 前缀，猜必 404，全部记在 `references/platform.md`）：
+
+```
+首页/登录  https://sticker.weixin.qq.com/cgi-bin/mmemoticonwebnode-bin/pages/home
+注册       https://sticker.weixin.qq.com/cgi-bin/mmemoticonwebnode-bin/pages/signup
+```
+
+登录只有「微信扫码」和「账号密码」两种，扫码这步 agent 代不了 ——
+用 `ego-browser` 的 `handOffTaskSpace` 把浏览器交还给人。
+
 **唯一不可逆的一步在这里**：作品挂到表情形象后，只有 **1 次**改到其他形象的机会
 （且要先从原形象删除再加到新形象）。挂之前把形象确认清楚 —— 形象合集是拿关联推荐流量的入口。
 
@@ -256,6 +266,7 @@ python3 $SKILL_DIR/scripts/fit_assets.py ~/Desktop/my-album \
 | `references/specs.md` | 官方制作规范全文（表情/形象/特效/艺术家/赞赏/付费）— **数字真源** |
 | `references/audit.md` | 官方审核标准全文 + 高频拒因清单 |
 | `references/ip-design.md` | IP 命名 / 简介 / 情绪选题 / 含义词写法（小白主要看这篇） |
+| `references/platform.md` | **平台地图**：真实 URL、登录方式、账号前置条件（路径猜不出来，别拼） |
 | `references/pitfalls.md` | 开发本 skill 时踩过的坑：中文 bash 三坑、CLI 输出通道、图像机检误报 |
 | `templates/album.yml` | 文案模板，可被机检脚本解析 |
 | `scripts/ip.py` | **IP 库**：注册形象 / 完善进度 / 跨形象约束校验 / HTML 面板 / 备份到私有仓库 |

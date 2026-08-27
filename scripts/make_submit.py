@@ -49,7 +49,7 @@ def main():
 
     out = f"""# 提交清单 — {c.get('album_name', '(未填专辑名)')}
 
-机检通过后按此表在[微信表情开放平台](https://sticker.weixin.qq.com/)逐项填写。
+机检通过后按此表在[微信表情开放平台](https://sticker.weixin.qq.com/cgi-bin/mmemoticonwebnode-bin/pages/home)逐项填写。
 素材目录：`{os.path.abspath(d)}`
 
 ## 一、表情形象（第一次投稿要先建形象）
