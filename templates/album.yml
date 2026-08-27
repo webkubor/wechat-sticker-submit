@@ -22,3 +22,11 @@ meanings:
 
 # 仅开通赞赏时需要，5~15 字
 reward_guide_text: 待填赞赏引导语（5~15 字）
+
+# 附加信息 —— 官方规范文档里没写，但平台提交时必填（选项见 references/platform.md）
+sticker_type: 表情卡通        # 真人拍摄 / 表情截图 / 表情卡通 / 表情其他
+role: 宠物/动物角色 → 猫       # 角色出现的表情数须 ≥ 总数 1/3
+style: 软萌可爱, 日常          # 选 1~2 项
+theme: 万能通用               # 与主题相关的表情数须 ≥ 总数一半
+region_publish: 中国大陆
+region_download: 中国大陆
