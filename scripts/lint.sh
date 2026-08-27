@@ -75,7 +75,30 @@ else
   say "✅" "外部命令的错误可见性"
 fi
 
-# 7) 语法
+# 7) 数据分层：不允许在数据根下随手新建旁挂目录
+# 加这条的原因：新增能力时容易「就近落盘」——加推广文案就建 captions/、
+# 加平台状态就写 ip.yml，每一步单看都合理，攒起来就是配置散落一地。
+# 约定：形象级 → ips/<形象>/；系列级 → albums/<形象>/<系列>/album.yml；
+#       全局依赖 → 白名单里的那几个。新增位置要先改这里的白名单。
+H="${STICKER_HOME:-$HOME/.wechat-stickers}"
+if [[ -d "$H" ]]; then
+  ALLOW="ips albums outbox bgm"
+  stray=""
+  for d in "$H"/*/; do
+    n=$(basename "$d")
+    [[ " $ALLOW " == *" $n "* ]] || stray="$stray $n"
+  done
+  if [[ -n "$stray" ]]; then
+    say "❌" "数据根下有未登记的目录：$stray"
+    echo "     形象级配置进 ips/<形象>/，系列级配置进 albums/<形象>/<系列>/album.yml，" 
+    echo "     确实是全局依赖才加进 lint.sh 的 ALLOW 白名单"
+    FAIL=$((FAIL + 1))
+  else
+    say "✅" "数据分层无旁挂目录"
+  fi
+fi
+
+# 8) 语法
 for f in ./*.sh; do
   bash -n "$f" || { say "❌" "$f 语法错误"; FAIL=$((FAIL + 1)); }
 done

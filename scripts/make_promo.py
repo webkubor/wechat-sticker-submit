@@ -25,8 +25,16 @@
 
 ## 文案
 
-默认用 `album.yml` 的含义词。给 `--captions` 可换成「什么时候发这张」那种场景文案，
-每行一条、按表情图顺序对应 —— 传播力比重复画面文字强。
+推广文案的真源是 `album.yml` 的 `captions` 段（一套系列的配置全在一个文件里）：
+
+```yaml
+captions:
+  - 需要被安慰的时候
+  - 催外卖 / 催开饭
+```
+
+写「什么时候发这张」而不是重复画面文字，传播力更强。没写 `captions` 就退回用含义词。
+`--captions` 只作临时覆盖，试不同文案时用。
 """
 import argparse
 import glob
@@ -107,7 +115,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("series", help="系列目录（含 表情图/ 与 album.yml）")
     ap.add_argument("--out", help="输出 mp4，默认放系列目录下 推广视频-<专辑名>.mp4")
-    ap.add_argument("--captions", help="文案文件，每行一条，按表情图顺序对应")
+    ap.add_argument("--captions", help="临时覆盖用的文案文件（每行一条）。"
+                                       "常规请写在 album.yml 的 captions 段里")
     ap.add_argument("--music", help="配乐音频。会自动裁到视频长度并加首尾淡入淡出。"
                                     "免费免署名来源：mixkit.co/free-stock-music（直链 "
                                     "assets.mixkit.co/music/<id>/<id>.mp3）")
@@ -134,7 +143,9 @@ def main():
     subtitle = c.get("ip_name", "")
     words = c.get("meanings", [])
 
-    caps = []
+    # 推广文案的真源是 album.yml 的 captions 段 —— 一套系列的配置全在一个文件里。
+    # --captions 只作临时覆盖（试不同文案时用），不作为常规存放位置。
+    caps = list(c.get("captions", []))
     if args.captions:
         caps = [ln.strip() for ln in open(args.captions, encoding="utf-8") if ln.strip()]
     if len(caps) < len(pics):

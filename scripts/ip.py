@@ -284,7 +284,9 @@ def cmd_list(_args):
                 print(f"      ↳ {label}：{note}")
         for sname in on_disk:
             cnt, ready = series_state(n, sname)
-            print(f"      {'✅' if ready else '🚧'} {sname}（{cnt} 张{'' if ready else '，未就绪'}）")
+            state, _ = platform_status(n, sname)
+            icon = PLATFORM_STATES.get(state, ("❔",))[0]
+            print(f"      {icon} {sname}（{cnt} 张）· {state}")
     print("─" * 68)
     if pending:
         print(f"{pending} 个形象还没齐 —— ip.py show <名称> 看待办")
@@ -316,9 +318,10 @@ def cmd_show(args):
     print(f"\n  系列 {len(on_disk)} 套    {os.path.join(ALBUMS, name)}")
     for sname in on_disk:
         cnt, ready = series_state(name, sname)
-        note = f"{cnt} 张，可提交" if ready else (f"{cnt} 张，未就绪（需 8~24 张且有 submit.md）" if cnt else "还没出图")
-        star = "" if sname in recorded else "   ⚠️ 未记入 ip.yml"
-        print(f"    {'✅' if ready else '🚧'} {sname:<16} {note}{star}")
+        state, when = platform_status(name, sname)
+        icon, desc = PLATFORM_STATES.get(state, ("❔", state))
+        local = f"{cnt} 张" + ("，素材就绪" if ready else "，素材未就绪")
+        print(f"    {icon} {sname:<16} {state}{'（' + when + '）' if when else ''}　{local}　{desc}")
     for g in [r for r in recorded if r not in on_disk]:
         print(f"    ❌ {g:<16} ip.yml 有记录，磁盘上没有")
     if not on_disk:
@@ -606,6 +609,69 @@ def cmd_sync(args):
     return 0
 
 
+PLATFORM_STATES = {
+    "未提交": ("📦", "本地就绪，还没投"),
+    "审核中": ("⏳", "已提交，等平台审核"),
+    "已上架": ("✅", "线上可下载"),
+    "未通过": ("❌", "被驳回，需改后重投"),
+    "已下架": ("⛔", "已从线上移除"),
+}
+
+
+def album_yml(ip, series):
+    return os.path.join(series_dir(ip, series), "album.yml")
+
+
+def platform_status(ip, series):
+    """读某套系列的平台状态。存在它自己的 album.yml 里 ——
+    一套系列的配置（文案/含义词/附加信息/推广文案/平台状态）全在一个文件，
+    不要散成 ip.yml 一处、captions/ 一处。"""
+    p = album_yml(ip, series)
+    if not os.path.exists(p):
+        return "未提交", ""
+    c = parse_copy(p)
+    return c.get("platform_status", "未提交"), c.get("platform_date", "")
+
+
+def set_album_field(ip, series, field, value):
+    """就地改 album.yml 的一个字段，没有就追加 —— 保留注释与其余内容。"""
+    p = album_yml(ip, series)
+    lines = open(p, encoding="utf-8").read().splitlines() if os.path.exists(p) else []
+    hit = False
+    for i, ln in enumerate(lines):
+        if ln.startswith(field + ":"):
+            lines[i] = f"{field}: {value}"
+            hit = True
+            break
+    if not hit:
+        lines += ["", f"{field}: {value}"]
+    with open(p, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
+
+
+def cmd_status(args):
+    """标记某套系列在平台上的状态。
+    本地机检通过只代表素材合规，跟平台是否上架是两件事 —— 混在一起看会误判进度。"""
+    meta = load(args.name)
+    if not meta:
+        print(f"❌ 没有形象「{args.name}」", file=sys.stderr)
+        return 1
+    if args.state not in PLATFORM_STATES:
+        print(f"❌ 状态只能是：{' / '.join(PLATFORM_STATES)}", file=sys.stderr)
+        return 1
+    on_disk = list_series(args.name)
+    if args.series not in on_disk:
+        print(f"❌ 磁盘上没有系列「{args.series}」，现有：{'、'.join(on_disk) or '（无）'}", file=sys.stderr)
+        return 1
+    set_album_field(args.name, args.series, "platform_status", args.state)
+    if args.date:
+        set_album_field(args.name, args.series, "platform_date", args.date)
+    icon = PLATFORM_STATES[args.state][0]
+    print(f"{icon} 「{args.name} / {args.series}」→ {args.state}"
+          f"　（写入 {os.path.relpath(album_yml(args.name, args.series), HOME)}）")
+    return 0
+
+
 def series_dir(ip, series):
     return os.path.join(ALBUMS, ip, series)
 
@@ -686,6 +752,13 @@ def main():
     rn.add_argument("old")
     rn.add_argument("new")
     rn.set_defaults(func=cmd_rename)
+
+    st = sub.add_parser("status", help="标记系列在平台上的状态（未提交/审核中/已上架/未通过/已下架）")
+    st.add_argument("name")
+    st.add_argument("series")
+    st.add_argument("state", choices=list(PLATFORM_STATES))
+    st.add_argument("--date", help="状态发生日期，如 2026-08-27")
+    st.set_defaults(func=cmd_status)
 
     pg = sub.add_parser("page", help="生成 HTML 进度面板（自包含，双击可看）")
     pg.add_argument("--out", help="输出路径，默认 $STICKER_HOME/进度面板.html")
