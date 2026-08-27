@@ -135,7 +135,13 @@ def main():
         for i, f in enumerate(files, 1):
             # 编号前缀保证排序与上传顺序一致，后缀带含义词让人一眼看懂
             label = f"-{words[i-1]}" if i <= len(words) else ""
-            save(fit_square(Image.open(f), 240), f"{out}/{sub}/{i:02d}{label}.png", 500)
+            im = Image.open(f)
+            # 已经是合规的 240×240 就别再动它 —— 重切会等比缩到 94% 再贴透明边，
+            # 等于把人家原本铺满画面的构图凭空缩小一圈。只做格式与体积规整。
+            if im.size == (240, 240):
+                save(im.convert("RGBA"), f"{out}/{sub}/{i:02d}{label}.png", 500)
+            else:
+                save(fit_square(im, 240), f"{out}/{sub}/{i:02d}{label}.png", 500)
 
     if args.cover:
         print("封面图 240×240（透明）")

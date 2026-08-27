@@ -13,10 +13,12 @@
 set -euo pipefail
 
 STICKER_HOME="${STICKER_HOME:-$HOME/.wechat-stickers}"
-DIR="" IP="" EMOTIONS="" STYLE="" FORCE_GEN=0
+DIR="" IP="" EMOTIONS="" STYLE="" FORCE_GEN=0 COVER_SRC="" ICON_SRC=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --ip) IP="$2"; shift 2 ;;
+    --cover-from) COVER_SRC="$2"; shift 2 ;;
+    --icon-from) ICON_SRC="$2"; shift 2 ;;
     --emotions) EMOTIONS="$2"; shift 2 ;;
     --style) STYLE="$2"; shift 2 ;;
     --regen) FORCE_GEN=1; shift ;;
@@ -94,8 +96,11 @@ EOF
   exit 0
 fi
 
-if grep -q '^ip_name: 莓啾' "$COPY"; then
-  echo "⚠️  $COPY 还是模板默认值，先把文案改成你自己的形象再跑。" >&2
+# 占位符特意用「待填」开头这种真实形象名不会撞的写法 ——
+# 早先模板默认值直接写了某个真实 IP 名，结果那个 IP 真要投稿时被误判成「还没填」。
+if grep -qE '^(ip_name|album_name): 待填' "$COPY"; then
+  echo "⚠️  $COPY 还有「待填」字段，先把文案改完再跑。" >&2
+  grep -nE ': 待填' "$COPY" | sed 's/^/    /' >&2
   exit 1
 fi
 
@@ -150,7 +155,14 @@ fi
 # ── 第 3 段：切图 ─────────────────────────────────────────────
 FIRST=$(find "$RAW" -maxdepth 1 -type f \( -name '*.png' -o -name '*.jpg' -o -name '*.jpeg' \) \
         ! -name 'banner-src.*' | sort | head -1)
-FIT=(--cover "$FIRST" --icon "$FIRST")
+# 照片型专辑的表情图往往是白底的，不能拿来做封面/图标（那两项官方强制透明背景）。
+# 用 --cover-from / --icon-from 指定单独抠好的透明图；没给就退回 raw 第一张。
+# 形象已入库时，默认就用库里的形象头像/图标源，省得每次手填。
+if [[ -z "$COVER_SRC" && -n "$IP_NAME" && -f "$STICKER_HOME/ips/$IP_NAME/ip.png" ]]; then
+  COVER_SRC="$STICKER_HOME/ips/$IP_NAME/ip.png"
+fi
+[[ -n "$ICON_SRC" ]] || ICON_SRC="$COVER_SRC"
+FIT=(--cover "${COVER_SRC:-$FIRST}" --icon "${ICON_SRC:-$FIRST}")
 [[ -f "$RAW/banner-src.png" ]] && FIT+=(--banner "$RAW/banner-src.png")
 echo "▶ 切图 → 240×240 / 50×50 / 750×400（按形象名与含义词中文命名）"
 python3 "$S/fit_assets.py" "$RAW" "$DIR" --copy "$COPY" "${FIT[@]}"
