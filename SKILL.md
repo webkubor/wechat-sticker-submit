@@ -2,9 +2,9 @@
 name: wechat-sticker-submit
 description: 微信表情开放平台静态表情投稿全流程 SOP —— 一张 IP 正面照进，整套可提交素材出。覆盖 IP 命名与简介文案、9 情绪选题、museav 中台批量出图、240×240 表情图 / 750×400 详情页横幅 / 240×240 封面 / 50×50 聊天面板图标切图、透明背景与白描边机检、含义词字数校验、赞赏三件套、付费表情（10 微信豆）、审核红线与高频拒因。触发词：微信表情、表情包、表情专辑、表情投稿、提交表情、表情形象、微信表情开放平台、sticker、表情审核、含义词、赞赏引导图、付费表情、微信豆、表情封面、聊天面板图标。
 metadata:
-  version: "1.0.0"
-  updated: "2026-08-26"
-  scope: "静态表情（动态 GIF 与视频号特效不在本版范围）"
+  version: "1.1.0"
+  updated: "2026-08-27"
+  scope: "静态表情 + 动态表情（透明 GIF）；视频号特效仅归档规范，流水线不覆盖"
   source: "https://sticker.weixin.qq.com/cgi-bin/mmemoticon-bin/readtemplate?t=guide/index.html#/makingSpecifications"
 ---
 
