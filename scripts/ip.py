@@ -9,14 +9,23 @@
 库位置默认 ~/.wechat-stickers，可用环境变量 STICKER_HOME 覆盖：
 
     $STICKER_HOME/ips/<IP名>/
-    ├── ip.yml           名称 / 简介 / 正面照来源 / 已挂专辑
+    ├── ip.yml           名称 / 简介 / 正面照来源 / 已挂专辑 / 待办
     ├── ip.png           正面照母版（出图垫图用这张，保证多套专辑形象一致）
     ├── ip-reverse.txt   读图逆向出的英文 prompt（一个 IP 只读一次，省时间省配额）
     ├── 形象头像-<IP>.png  240×240 透明 —— 形象主页用，与专辑封面是两回事
-    └── 形象图标-<IP>.png  50×50 透明
+    ├── 形象图标-<IP>.png  50×50 透明
+    └── source/          原始画稿池（不可再生，多套专辑从这里挑图）
 
-为什么要分两层：官方的「表情形象」是账号级资产（有自己的名称/简介/头像/图标），
-一个形象可以挂多套专辑；而封面图、横幅、含义词是专辑级的。混在一起就会出现
+分层的依据是**能不能再生**，不是「哪个更重要」：
+
+    IP 库（这里）        原始画稿 + 形象母版 —— 丢了画不回来 → 全部 git 版本化
+    专辑目录            表情图/封面/横幅/submit.md —— 有画稿加脚本就能重跑 → 不进 git
+
+所以 ip.py sync 备份的是 IP 库，专辑产物不备份。要是反过来只备份产物，
+真正贵的东西反而没保住。
+
+另一条分层依据来自官方模型：「表情形象」是账号级资产（自己的名称/简介/头像/图标），
+一个形象可挂多套专辑；封面图、横幅、含义词才是专辑级的。混在一起就会出现
 「同一个 IP 的两套专辑简介不一致」「两个形象用了同一张头像」这类必被打回的问题。
 """
 import argparse
@@ -120,6 +129,10 @@ def progress(name):
     rev = os.path.join(d, "ip-reverse.txt")
     items.append(("ok" if os.path.exists(rev) and os.path.getsize(rev) else "missing",
                   "读图 prompt", "已生成，多套专辑复用" if os.path.exists(rev) else "缺失，出图时会现读"))
+    src_dir = os.path.join(d, "source")
+    n_src = sum(1 for r, _, fs in os.walk(src_dir) for f in fs if not f.startswith(".")) if os.path.isdir(src_dir) else 0
+    items.append(("ok" if n_src else "missing", "原始素材池",
+                  f"source/ {n_src} 个原稿（不可再生，跟着 git 走）" if n_src else "缺失 —— 原始画稿只在别处的话就没备份"))
     st, note = asset_state(avatar_of(name), (240, 240))
     items.append((st, "形象头像 240×240", note))
     icon = next((os.path.join(d, f) for f in (os.listdir(d) if os.path.isdir(d) else [])
@@ -216,6 +229,24 @@ def cmd_add(args):
         print(f"⚠️  头像与已有形象 {'、'.join(clash)} 几乎相同 —— 官方要求不同形象不得用同一张头像，"
               f"换一张更有区分度的正面照重做", file=sys.stderr)
 
+    if getattr(args, "source", None):
+        sd = os.path.expanduser(args.source)
+        if os.path.isdir(sd):
+            dst = os.path.join(d, "source")
+            os.makedirs(dst, exist_ok=True)
+            n = 0
+            for root, _, fs in os.walk(sd):
+                for f in fs:
+                    if f.startswith("."):
+                        continue
+                    rel = os.path.relpath(os.path.join(root, f), sd)
+                    target = os.path.join(dst, rel)
+                    os.makedirs(os.path.dirname(target), exist_ok=True)
+                    shutil.copy2(os.path.join(root, f), target)
+                    n += 1
+            print(f"✓ 原始画稿 {n} 个 → {dst}")
+        else:
+            print(f"⚠️  --source 不是目录：{sd}", file=sys.stderr)
     todo = [t for t in (args.todo or [])]
     save(name, {"name": name, "desc": args.desc or "", "type": args.type or "",
                 "source": photo, "created": args.today or "", "albums": [], "todo": todo})
@@ -337,6 +368,24 @@ def cmd_update(args):
             print(f"❌ 简介 {len(args.desc)} 字，超出 80 字上限", file=sys.stderr)
             return 1
         meta["desc"] = args.desc
+    if getattr(args, "add_source", None):
+        sd = os.path.expanduser(args.add_source)
+        if os.path.isdir(sd):
+            dst = os.path.join(d, "source")
+            os.makedirs(dst, exist_ok=True)
+            n = 0
+            for root, _, fs in os.walk(sd):
+                for f in fs:
+                    if f.startswith("."):
+                        continue
+                    rel = os.path.relpath(os.path.join(root, f), sd)
+                    target = os.path.join(dst, rel)
+                    os.makedirs(os.path.dirname(target), exist_ok=True)
+                    shutil.copy2(os.path.join(root, f), target)
+                    n += 1
+            print(f"✓ 原始画稿 {n} 个 → {dst}")
+        else:
+            print(f"⚠️  --add-source 不是目录：{sd}", file=sys.stderr)
     if args.clear_todo:
         meta["todo"] = []
     for t in (args.todo or []):
@@ -449,6 +498,7 @@ def main():
     a.add_argument("--desc", help="形象简介，≤80 字")
     a.add_argument("--type", choices=["photo", "illustration"], help="照片型 / 插画型")
     a.add_argument("--todo", action="append", help="待办事项，可重复传")
+    a.add_argument("--source", help="原始画稿目录，一并收进 IP 库的 source/（不可再生资产别只留在别处）")
     a.add_argument("--today", help="创建日期，由调用方传入（脚本不取系统时间）")
     a.set_defaults(func=cmd_add)
 
@@ -470,6 +520,7 @@ def main():
     up.add_argument("--todo", action="append", help="追加待办")
     up.add_argument("--clear-todo", action="store_true", help="清空待办")
     up.add_argument("--rereverse", action="store_true", help="换图后重新读图出 prompt")
+    up.add_argument("--add-source", help="把一个目录的原始画稿补进 IP 库的 source/")
     up.set_defaults(func=cmd_update)
 
     sy = sub.add_parser("sync", help="备份形象库到私有 GitLab 仓库（首次自动建仓）")
