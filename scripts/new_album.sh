@@ -1,13 +1,18 @@
 #!/usr/bin/env bash
 # 一键跑完整套静态表情：填文案 → 出图 → 切图 → 机检 → 提交清单
 #
-#   new_album.sh ~/Desktop/my-album --ip ~/Desktop/ip.png
-#   new_album.sh ~/Desktop/my-album              # 自己画好图放进 my-album/raw/ 也行
+#   new_album.sh ~/Desktop/团子日常 --ip 团子           # 用 IP 库里的形象（推荐）
+#   new_album.sh ~/Desktop/团子日常 --ip ~/Desktop/ip.png  # 直接给正面照（一次性）
+#   new_album.sh ~/Desktop/团子日常                      # 自己画好图放进 raw/ 也行
+#
+# --ip 给名字时从 IP 库取形象（正面照 + 读图 prompt + 形象名/简介都复用），
+# 一个 IP 出多套专辑就靠这个保持一致。注册形象：ip.py add <名称> <正面照>
 #
 # 幂等：同一条命令可以反复跑。第一次跑生成 album.yml 就停下让你填文案，
 # 填完再跑同一条命令，它会自动接着往下走；中途失败修完再跑，不会重做已完成的部分。
 set -euo pipefail
 
+STICKER_HOME="${STICKER_HOME:-$HOME/.wechat-stickers}"
 DIR="" IP="" EMOTIONS="" STYLE="" FORCE_GEN=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -19,23 +24,64 @@ while [[ $# -gt 0 ]]; do
     *) DIR="$1"; shift ;;
   esac
 done
-[[ -n "$DIR" ]] || { echo "用法: new_album.sh <目录> [--ip <IP正面照>]" >&2; exit 2; }
+[[ -n "$DIR" ]] || { echo "用法: new_album.sh <目录> [--ip <IP名或正面照>]" >&2; exit 2; }
 
 S="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(dirname "$S")"
 mkdir -p "$DIR"
 COPY="$DIR/album.yml"
 
+# ── 第 0 段：解析 --ip 是「库里的形象名」还是「一张正面照」────────
+IP_NAME="" IP_PHOTO=""
+if [[ -n "$IP" ]]; then
+  if [[ -f "$IP" ]]; then
+    IP_PHOTO="$IP"          # 直给照片：一次性用法，形象信息不入库
+  else
+    IP_NAME="$IP"
+    IP_PHOTO="$STICKER_HOME/ips/$IP_NAME/ip.png"
+    if [[ ! -f "$IP_PHOTO" ]]; then
+      cat >&2 <<EOF
+⚠️  IP 库里没有形象「${IP_NAME}」（找的是 ${IP_PHOTO}）
+
+先注册，之后所有专辑都能复用这一个形象：
+  python3 $S/ip.py add $IP_NAME <正面照路径> --desc "形象简介，≤80 字"
+
+已注册的形象：$(python3 "$S/ip.py" list 2>/dev/null | grep -oE '^  [^ ]+' | tr -d ' ' | tr '\n' ' ' || true)
+EOF
+      exit 1
+    fi
+    echo "🎭 形象「${IP_NAME}」（来自 IP 库 ${STICKER_HOME}）"
+  fi
+fi
+
 # ── 第 1 段：文案 ─────────────────────────────────────────────
 if [[ ! -f "$COPY" ]]; then
   cp "$ROOT/templates/album.yml" "$COPY"
+  # 库里有形象就把形象名/简介预填进去 —— 同一个 IP 的多套专辑，这两项必须一致
+  if [[ -n "$IP_NAME" ]]; then
+    python3 - "$COPY" "$STICKER_HOME/ips/$IP_NAME/ip.yml" <<'PY'
+import re, sys
+copy_path, ip_path = sys.argv[1], sys.argv[2]
+ip = {}
+for line in open(ip_path, encoding='utf-8'):
+    if ':' in line and not line.startswith((' ', '#')):
+        k, v = line.split(':', 1); ip[k.strip()] = v.strip()
+s = open(copy_path, encoding='utf-8').read()
+s = re.sub(r'^ip_name: \S+', 'ip_name: ' + ip.get('name', ''), s, count=1, flags=re.M)
+if ip.get('desc'):
+    s = re.sub(r'^ip_desc: .*$', 'ip_desc: ' + ip['desc'], s, count=1, flags=re.M)
+open(copy_path, 'w', encoding='utf-8').write(s)
+PY
+    echo "✓ 已按形象「${IP_NAME}」预填 ip_name / ip_desc"
+  fi
   cat <<EOF
 
 已生成文案模板：$COPY
 
-请先填这 5 项（字数上限已写在文件注释里）：
+请先填这几项（字数上限已写在文件注释里）：$(if [[ -n "$IP_NAME" ]]; then echo "
+  （ip_name / ip_desc 已按 IP 库预填，不用改）"; else echo "
   ip_name     形象名，≤8 字，须能对应到具体角色（不要用「治愈系日常」这种风格名）
-  ip_desc     形象简介，≤80 字，三句式：它是谁 → 什么性格 → 在做什么
+  ip_desc     形象简介，≤80 字，三句式：它是谁 → 什么性格 → 在做什么"; fi)
   album_name  专辑名，≤8 字
   album_desc  专辑介绍，≤80 字
   meanings    含义词，每条 ≤4 字、同套不重复 —— 这是用户在表情面板里搜的词，不是画面台词
@@ -57,19 +103,34 @@ COUNT=$(grep -cE '^[[:space:]]+- ' "$COPY" || true)
 [[ "$COUNT" -ge 8 ]] || { echo "⚠️  含义词只有 $COUNT 条，官方要求 8~24 张，先在 $COPY 里补齐。" >&2; exit 1; }
 echo "✓ 文案就绪：$COUNT 条含义词 → 出 $COUNT 张表情"
 
+# 用了 IP 库就校验一致性：形象名写错会把作品挂到别的形象上，而改归属只有 1 次机会
+if [[ -n "$IP_NAME" ]]; then
+  COPY_IP=$(grep -m1 '^ip_name:' "$COPY" | sed 's/^ip_name:[[:space:]]*//; s/[[:space:]]*#.*//' || true)
+  if [[ "$COPY_IP" != "$IP_NAME" ]]; then
+    echo "⚠️  $COPY 里的 ip_name「${COPY_IP}」与 --ip「${IP_NAME}」不一致。" >&2
+    echo "    形象挂错后只有 1 次改的机会，先改成一致再跑。" >&2
+    exit 1
+  fi
+fi
+
 # ── 第 2 段：原图 ─────────────────────────────────────────────
 RAW="$DIR/raw"
 mkdir -p "$RAW"
+# 复用 IP 库里的读图 prompt：一个形象只读一次图，多套专辑风格才不会漂
+if [[ -n "$IP_NAME" && -s "$STICKER_HOME/ips/$IP_NAME/ip-reverse.txt" && ! -s "$RAW/ip-reverse.txt" ]]; then
+  cp "$STICKER_HOME/ips/$IP_NAME/ip-reverse.txt" "$RAW/ip-reverse.txt"
+  echo "✓ 复用形象「${IP_NAME}」的读图 prompt（不再重复读图）"
+fi
 HAVE=$(find "$RAW" -maxdepth 1 -type f \( -name '*.png' -o -name '*.jpg' -o -name '*.jpeg' \) \
        ! -name 'banner-src.*' | wc -l | tr -d ' ')
 
 if [[ "$HAVE" -lt 8 || "$FORCE_GEN" -eq 1 ]]; then
-  if [[ -n "$IP" && -f "$IP" ]] && command -v museav >/dev/null; then
-    ARGS=(--ip "$IP" --out "$DIR" --count "$COUNT")
+  if [[ -n "$IP_PHOTO" && -f "$IP_PHOTO" ]] && command -v museav >/dev/null; then
+    ARGS=(--ip "$IP_PHOTO" --out "$DIR" --count "$COUNT")
     [[ -n "$EMOTIONS" ]] && ARGS+=(--emotions "$EMOTIONS")
     [[ -n "$STYLE" ]] && ARGS+=(--style "$STYLE")
     [[ "$FORCE_GEN" -eq 1 ]] && ARGS+=(--regen)
-    echo "▶ 用 museav 出图（约 $((COUNT * 50 / 3 + 60)) 秒）..."
+    echo "▶ 用 museav 出图（约 $((COUNT * 50 / 2 + 60)) 秒）..."
     "$S/gen_album.sh" "${ARGS[@]}"
   else
     reason="没给 --ip"
@@ -115,10 +176,17 @@ EOF
   exit "$FAILS"
 fi
 
-# ── 第 5 段：提交清单 ─────────────────────────────────────────
+# ── 第 5 段：提交清单 + 回写形象归属 ──────────────────────────
 python3 "$S/make_submit.py" "$DIR" --copy "$COPY"
+if [[ -n "$IP_NAME" ]]; then
+  python3 "$S/ip.py" link "$IP_NAME" "$DIR" || true
+fi
 cat <<EOF
 
 ✅ 全部就绪。打开 $DIR/submit.md，照着表格在平台逐项填写。
    平台入口：https://sticker.weixin.qq.com/
 EOF
+if [[ -n "$IP_NAME" ]]; then
+  echo "   形象头像/图标（形象主页用，与专辑封面是不同字段）："
+  ls "$STICKER_HOME/ips/$IP_NAME" | grep -E '^形象' | sed "s|^|     $STICKER_HOME/ips/$IP_NAME/|" || true
+fi

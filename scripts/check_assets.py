@@ -140,6 +140,15 @@ def check_one(path, kind, rep):
             msg = f"四角不透明（{corner_op:.0%}）— 白底或正方形边框，{hint}"
             (rep.fail if spec["alpha"] == "must" else rep.warn)(name, msg)
         else:
+            # 四角透明不等于抠过图：切图留的几像素透明边会骗过四角检测，
+            # 中间仍是一整块矩形照片。看主体外接框里是不是「实心矩形」才准。
+            box = mask.getbbox()
+            if box:
+                area = (box[2] - box[0]) * (box[3] - box[1])
+                solid = sum(1 for v in mask.crop(box).tobytes() if v) / area if area else 0
+                if solid > 0.95:
+                    msg = "主体是实心矩形 — 只是缩放贴上的照片，没抠出轮廓"
+                    (rep.fail if spec["alpha"] == "must" else rep.warn)(name, msg)
             fr, fr_inner = white_fringe(im, mask)
             if fr > 0.30 and fr - fr_inner > 0.30:
                 rep.fail(name, f"主体轮廓 {fr:.0%} 近白、内部仅 {fr_inner:.0%} — 白色描边，须去掉")

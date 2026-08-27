@@ -44,7 +44,9 @@
 | 把台词当含义词（「555…我没事」） | 校验 ≤4 字、无标点、同套不重复、条数与张数一一对应 |
 | 图标裁成方块、四角发硬 | 自动取头部正面并留 12% 边 |
 | 出图偶发失败导致张数不足 | 单张重试一次；重跑只补缺失的，不重复烧配额 |
-| 作品挂错表情形象 | 流程里标出这是**唯一不可逆**的一步（只有 1 次改的机会） |
+| 作品挂错表情形象 | `album.yml` 的 ip_name 与 `--ip` 不一致直接拦下（改归属只有 1 次机会） |
+| 多个 IP 混着做，简介/头像串了 | IP 库分层存放；形象名重复、不同形象同头像都会被拒 |
+| 形象母版只存在本地，丢了合集就断 | `ip.py sync` 推私有仓库版本化，换机 clone 即恢复 |
 
 ## 安装
 
@@ -55,12 +57,50 @@ git clone https://github.com/webkubor/wechat-sticker-submit.git \
 
 装完在 Claude Code 里说「帮我做一套微信表情」即可触发；也可以只当命令行工具用。
 
-## 用法：一条命令，反复跑
+## IP 库：形象入库一次，多套专辑复用
+
+官方的「表情形象」是账号级资产（自己的名称/简介/头像/图标），一个形象可以挂多套专辑；
+封面图、横幅、含义词才是专辑级的。这两层混在一起，就会出现「同一个 IP 两套专辑简介不一致」
+「两个形象用了同一张头像」这类必被打回的问题。所以形象单独存一份：
 
 ```bash
 SKILL_DIR=~/.claude/skills/wechat-sticker-submit
 
-$SKILL_DIR/scripts/new_album.sh ~/Desktop/团子日常 --ip ~/Desktop/ip.png
+python3 $SKILL_DIR/scripts/ip.py add 团子 ~/Desktop/正面照.png --desc "简介，≤80 字"
+python3 $SKILL_DIR/scripts/ip.py list          # 有哪些形象
+python3 $SKILL_DIR/scripts/ip.py show 团子      # 完善进度 + 待办 + 已挂专辑
+python3 $SKILL_DIR/scripts/ip.py sync          # 备份到私有 GitLab 仓库（首次自动建仓）
+```
+
+`show` 会逐项核对官方对「表情形象」的要求，并把不合规的地方说清楚：
+
+```console
+🎭 莓啾    完善进度 4/6
+  ✅ 形象名称             莓啾（2 字）
+  ✅ 形象简介             40 字
+  ✅ 正面照母版            351×460
+  ✅ 读图 prompt          已生成，多套专辑复用
+  ⚠️  形象头像 240×240     主体是实心矩形 → 只是缩放贴上的照片，没抠出轮廓
+  ⚠️  形象图标 50×50       主体是实心矩形 → 只是缩放贴上的照片，没抠出轮廓
+
+  待办：
+    · 形象头像/图标需抠透明背景
+```
+
+三条官方跨形象约束在这里自动生效：**形象名不得重复**（重名直接拒绝）、
+**不同形象不得用同一张头像**（按差分哈希比对已有形象）、
+**一套作品只能挂一个形象且改归属只有 1 次机会**（`new_album.sh` 校验 `album.yml`
+里的 `ip_name` 与 `--ip` 是否一致，不一致就拦下）。
+
+库默认在 `~/.wechat-stickers/`（`STICKER_HOME` 可覆盖）。
+**形象母版丢了整条形象合集就断了**（表情图丢了还能重出），所以 `ip.py sync`
+把图片与元数据一起推到私有仓库版本化，换机恢复就是 `git clone <仓库> ~/.wechat-stickers`。
+
+## 用法：一条命令，反复跑
+
+```bash
+$SKILL_DIR/scripts/new_album.sh ~/Desktop/团子日常 --ip 团子      # 用库里的形象
+$SKILL_DIR/scripts/new_album.sh ~/Desktop/团子日常 --ip ~/ip.png  # 或直接给正面照
 ```
 
 这条命令幂等，卡住就修完再跑同一条：
@@ -168,11 +208,13 @@ $ python3 scripts/check_assets.py 团子日常 --copy 团子日常/album.yml
 | 文件 | 用途 |
 |---|---|
 | `SKILL.md` | 主流程（Claude Code 读这个） |
+| `scripts/ip.py` | **IP 库**：注册形象 / 完善进度 / 跨形象约束 / 备份到私有仓库 |
 | `scripts/new_album.sh` | **一键入口**（幂等）：文案 → 出图 → 切图 → 机检 → 提交清单 |
 | `scripts/gen_album.sh` | 一张正面照 → 整套原图（含重试与补差集） |
 | `scripts/fit_assets.py` | 源图 → 合规尺寸素材（抠白底 / 去留白 / 居中 / 压体积） |
 | `scripts/check_assets.py` | 素材 + 文案机检，退出码 = FAIL 数 |
 | `scripts/make_submit.py` | 生成 `submit.md`：平台表单字段 → 值/文件对照表 |
+| `scripts/lint.sh` | 脚本门禁：把 pitfalls 里踩过的坑变成能跑的检查 |
 | `references/specs.md` | 官方制作规范全文（表情/形象/特效/艺术家/赞赏/付费）— 数字真源 |
 | `references/audit.md` | 官方审核标准全文 + 高频拒因 |
 | `references/ip-design.md` | IP 命名 / 简介 / 9 情绪选题 / 含义词写法 |

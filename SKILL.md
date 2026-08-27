@@ -20,10 +20,15 @@ metadata:
 SKILL_DIR=~/.claude/skills/wechat-sticker-submit
 ```
 
-## 最快路径：一条命令，反复跑
+## 最快路径：形象入库一次，之后每套专辑一条命令
 
 ```bash
-$SKILL_DIR/scripts/new_album.sh ~/Desktop/my-album --ip ~/Desktop/ip.png
+# 第一次：把形象存进 IP 库（一个形象只做这一次）
+python3 $SKILL_DIR/scripts/ip.py add 团子 ~/Desktop/正面照.png --desc "形象简介，≤80 字"
+python3 $SKILL_DIR/scripts/ip.py sync          # 备份到私有仓库，形象母版不可再生
+
+# 之后每套专辑：
+$SKILL_DIR/scripts/new_album.sh ~/Desktop/团子日常 --ip 团子
 ```
 
 **这条命令是幂等的，卡住就修完再跑同一条。** 它的行为：
@@ -39,9 +44,41 @@ $SKILL_DIR/scripts/new_album.sh ~/Desktop/my-album --ip ~/Desktop/ip.png
 
 ---
 
-## Step 1 · 备一张 IP 正面照
+## Step 1 · 把形象存进 IP 库（一次，之后长期复用）
 
-要求就一条：**角色正面、完整、你拥有版权**。手绘扫描、AI 出的、自家宠物照都行；
+```bash
+python3 $SKILL_DIR/scripts/ip.py add <形象名> <正面照> --desc "简介，≤80 字"
+python3 $SKILL_DIR/scripts/ip.py list        # 有哪些形象
+python3 $SKILL_DIR/scripts/ip.py show 团子    # 完善进度 + 待办 + 已挂专辑
+python3 $SKILL_DIR/scripts/ip.py sync        # 备份到私有 GitLab 仓库
+```
+
+**为什么要有 IP 库**：官方的「表情形象」是账号级资产（自己的名称/简介/头像/图标），
+一个形象可以挂多套专辑；封面图、横幅、含义词才是专辑级的。混在一起必然出现
+「同一个 IP 两套专辑简介不一致」「两个形象用了同一张头像」这类会被打回的问题。
+而且官方有三条跨形象的硬约束，只有集中存放才查得了：
+
+- 同一作者的形象名不得重复 → `ip.py add` 直接拒绝重名
+- 不同形象不得用同一张头像/图标 → 注册时按差分哈希比对已有形象，太像就警告
+- **一套作品只能挂一个形象，改归属只有 1 次机会** → `new_album.sh` 会校验
+  `album.yml` 里的 `ip_name` 与 `--ip` 一致，不一致直接拦下
+
+**库在哪**：默认 `~/.wechat-stickers/`，用环境变量 `STICKER_HOME` 覆盖。结构：
+
+```
+~/.wechat-stickers/ips/<形象名>/
+├── ip.png            正面照母版 —— 出图垫图用这张，多套专辑形象才不会漂
+├── ip-reverse.txt    读图逆向的英文 prompt，一个形象只读一次（省时间省配额）
+├── 形象头像-<名>.png   240×240 透明，形象主页用
+├── 形象图标-<名>.png   50×50 透明
+└── ip.yml            名称 / 简介 / 已挂专辑 / 待办
+```
+
+**备份不是可选项**：形象母版丢了，整条形象合集就断了（表情图丢了还能重出）。
+`ip.py sync` 把整个库推到私有 GitLab 仓库，图片与元数据一起版本化；
+换机恢复就是 `git clone <仓库> ~/.wechat-stickers`。首次 sync 会自动建仓。
+
+对正面照的要求只有一条：**角色正面、完整、你拥有版权**。手绘扫描、AI 出的、自家宠物照都行；
 别拿他人作品或知名 IP 垫图 —— 那属于审核明文禁止的「权利所属不明」。
 
 照片型（真宠物照）和插画型都能投，但差别要知道：
@@ -189,7 +226,9 @@ python3 $SKILL_DIR/scripts/fit_assets.py ~/Desktop/my-album \
 | `references/ip-design.md` | IP 命名 / 简介 / 情绪选题 / 含义词写法（小白主要看这篇） |
 | `references/pitfalls.md` | 开发本 skill 时踩过的坑：中文 bash 三坑、CLI 输出通道、图像机检误报 |
 | `templates/album.yml` | 文案模板，可被机检脚本解析 |
+| `scripts/ip.py` | **IP 库**：注册形象 / 完善进度 / 跨形象约束校验 / 备份到私有仓库 |
 | `scripts/new_album.sh` | **一键入口**，幂等：文案 → 出图 → 切图 → 机检 → 清单 |
+| `scripts/lint.sh` | 脚本门禁：把 pitfalls 里踩过的坑变成能跑的检查 |
 | `scripts/gen_album.sh` | 一张正面照 → 整套原图（museav 出图中台） |
 | `scripts/fit_assets.py` | 源图 → 合规尺寸素材（仅依赖 PIL） |
 | `scripts/check_assets.py` | 素材 + 文案机检，退出码 = FAIL 数 |
