@@ -231,17 +231,26 @@ def cmd_list(_args):
         print(f"IP 库还是空的（{IPS}）\n用 ip.py add <名称> <正面照> 注册第一个形象")
         return 0
     print(f"🎭 表情形象 {len(ips)} 个  —— {HOME}")
-    print("─" * 66)
+    print("─" * 68)
+    pending = 0
     for n in ips:
-        d = load(n) or {}
-        albums = d.get("albums", [])
-        has = lambda p: "✓" if p else "✗"  # noqa: E731
-        print(f"  {n:<10} 专辑 {len(albums)} 套   "
-              f"头像{has(avatar_of(n))} prompt{has(os.path.exists(os.path.join(ip_dir(n), 'ip-reverse.txt')))}")
-        if d.get("desc"):
-            print(f"             {d['desc'][:40]}")
-    print("─" * 66)
-    print("查详情：ip.py show <名称>")
+        items, meta = progress(n)          # 与 show 用同一套判定，避免两处口径不一致
+        done = sum(1 for s, _, _ in items if s == "ok")
+        albums = meta.get("albums", [])
+        flag = "✅" if done == len(items) else "🚧"
+        if done != len(items):
+            pending += 1
+        print(f"  {flag} {n:<10} 完善 {done}/{len(items)}   专辑 {len(albums)} 套")
+        if meta.get("desc"):
+            print(f"      {meta['desc'][:44]}")
+        for st, label, note in items:
+            if st != "ok":
+                print(f"      ↳ {label}：{note}")
+    print("─" * 68)
+    if pending:
+        print(f"{pending} 个形象还没齐 —— ip.py show <名称> 看待办")
+    else:
+        print("形象资产都已齐备")
     return 0
 
 
