@@ -66,6 +66,7 @@ $SKILL_DIR/scripts/new_album.sh --ip 团子 --series 打工     # 第二套，�
 # 随时看全局
 python3 $SKILL_DIR/scripts/ip.py list          # 每个形象几套系列、每套什么状态
 python3 $SKILL_DIR/scripts/ip.py show 团子      # 单个形象逐项核对
+python3 $SKILL_DIR/scripts/ip.py page          # 生成 HTML 面板并打开（缩略图一览）
 ```
 
 `new_album.sh` 幂等：同名系列反复跑会复用同一个目录，不会新建一堆空壳。
@@ -257,7 +258,8 @@ python3 $SKILL_DIR/scripts/fit_assets.py ~/Desktop/my-album \
 | `references/ip-design.md` | IP 命名 / 简介 / 情绪选题 / 含义词写法（小白主要看这篇） |
 | `references/pitfalls.md` | 开发本 skill 时踩过的坑：中文 bash 三坑、CLI 输出通道、图像机检误报 |
 | `templates/album.yml` | 文案模板，可被机检脚本解析 |
-| `scripts/ip.py` | **IP 库**：注册形象 / 完善进度 / 跨形象约束校验 / 备份到私有仓库 |
+| `scripts/ip.py` | **IP 库**：注册形象 / 完善进度 / 跨形象约束校验 / HTML 面板 / 备份到私有仓库 |
+| `scripts/page_tpl.py` | 面板的样式与渲染（被 `ip.py page` 调用） |
 | `scripts/new_album.sh` | **一键入口**，幂等：文案 → 出图 → 切图 → 机检 → 清单 |
 | `scripts/lint.sh` | 脚本门禁：把 pitfalls 里踩过的坑变成能跑的检查 |
 | `scripts/gen_album.sh` | 一张正面照 → 整套原图（museav 出图中台） |

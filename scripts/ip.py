@@ -414,6 +414,62 @@ def cmd_update(args):
     return cmd_show(args)
 
 
+def cmd_page(args):
+    """生成自包含 HTML 面板 —— 图片内嵌 base64，双击就能看，不依赖任何外链或服务。"""
+    from page_tpl import CSS, render, thumb_b64
+    ips = []
+    for name in all_ips():
+        items, meta = progress(name)
+        d = ip_dir(name)
+        av = avatar_of(name)
+        icon = next((os.path.join(d, f) for f in os.listdir(d) if f.startswith("形象图标")), None)
+        assets = []
+        if av:
+            assets.append({"src": thumb_b64(av, 96, "PNG"), "w": 76, "h": 76, "label": "形象头像 240×240"})
+        if icon:
+            assets.append({"src": thumb_b64(icon, 50, "PNG"), "w": 50, "h": 50, "label": "形象图标 50×50"})
+        series = []
+        for sname in list_series(name):
+            sd = series_dir(name, sname)
+            cnt, ready = series_state(name, sname)
+            pics_dir = os.path.join(sd, "表情图")
+            if not os.path.isdir(pics_dir):
+                pics_dir = os.path.join(sd, "main_240")
+            pics = []
+            if os.path.isdir(pics_dir):
+                for f in sorted(x for x in os.listdir(pics_dir) if not x.startswith(".")):
+                    pics.append({"src": thumb_b64(os.path.join(pics_dir, f), 96),
+                                 "label": os.path.splitext(f)[0]})
+            sassets = []
+            for pat, label, box in (("封面图-", "封面图 240×240", 76), ("聊天图标-", "聊天图标 50×50", 50),
+                                    ("详情页横幅-", "详情页横幅 750×400", 190)):
+                hit = next((os.path.join(sd, f) for f in os.listdir(sd) if f.startswith(pat)), None)
+                if hit:
+                    im_w, im_h = Image.open(hit).size
+                    h = round(box * im_h / im_w)
+                    sassets.append({"src": thumb_b64(hit, max(box, 190), "PNG" if pat != "详情页横幅-" else "JPEG"),
+                                    "w": box, "h": h, "label": label})
+            copy_path = os.path.join(sd, "album.yml")
+            c = parse_copy(copy_path) if os.path.exists(copy_path) else {}
+            series.append({"name": sname, "count": cnt, "ready": ready, "pics": pics,
+                           "assets": sassets, "album_name": c.get("album_name", "")})
+        ips.append({"name": name, "desc": meta.get("desc", ""), "items": items,
+                    "todo": meta.get("todo", []), "avatar": assets[0]["src"] if assets else "",
+                    "assets": assets, "series": series})
+
+    body = render(ips, ALBUMS, args.stamp or "")
+    html = ("<!doctype html><html lang=\"zh-CN\"><head><meta charset=\"utf-8\">"
+            "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
+            "<title>表情形象进度</title><style>" + CSS + "</style></head><body>" + body + "</body></html>")
+    out = args.out or os.path.join(HOME, "进度面板.html")
+    with open(out, "w", encoding="utf-8") as f:
+        f.write(html)
+    print(f"✓ 面板已生成：{out}（{os.path.getsize(out)/1024:.0f}KB，自包含）")
+    if not args.no_open and shutil.which("open"):
+        subprocess.run(["open", out], check=False)
+    return 0
+
+
 def git(*a, **kw):
     return subprocess.run(["git", "-C", HOME, *a], capture_output=True, text=True, **kw)
 
@@ -562,6 +618,12 @@ def main():
     up.add_argument("--rereverse", action="store_true", help="换图后重新读图出 prompt")
     up.add_argument("--add-source", help="把一个目录的原始画稿补进 IP 库的 source/")
     up.set_defaults(func=cmd_update)
+
+    pg = sub.add_parser("page", help="生成 HTML 进度面板（自包含，双击可看）")
+    pg.add_argument("--out", help="输出路径，默认 $STICKER_HOME/进度面板.html")
+    pg.add_argument("--stamp", help="页面上显示的时间戳（脚本不取系统时间，由调用方传）")
+    pg.add_argument("--no-open", action="store_true", help="生成后不自动打开")
+    pg.set_defaults(func=cmd_page)
 
     sy = sub.add_parser("sync", help="备份形象库到私有 GitLab 仓库（首次自动建仓）")
     sy.add_argument("--remote", help="已有仓库的 git URL；不给则用 glab 建 wechat-sticker-ips")
