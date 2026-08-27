@@ -65,13 +65,23 @@ def fit_head(im, side):
     return fit_square(im.crop((left, 0, left + s, min(h, s))), side, pad=0.88)
 
 
-def cover_crop(im, size):
-    """宣传图：覆盖裁切 + 白底压平（横幅与赞赏图不得透明）。"""
+def cover_crop(im, size, anchor="center"):
+    """宣传图：覆盖裁切 + 白底压平（横幅与赞赏图不得透明）。
+
+    anchor 控制纵向取哪一段。默认居中，但竖构图的素材居中裁会把顶部的主体切掉 ——
+    赞赏引导图尤其要用 top：平台会在图片下半部叠加金额选择 UI，
+    所以主体本来就该在上半部、下面留白。"""
     im = im.convert("RGBA")
     tw, th = size
     scale = max(tw / im.width, th / im.height)
     im = im.resize((round(im.width * scale), round(im.height * scale)), Image.LANCZOS)
-    left, top = (im.width - tw) // 2, (im.height - th) // 2
+    left = (im.width - tw) // 2
+    if anchor == "top":
+        top = 0
+    elif anchor == "bottom":
+        top = im.height - th
+    else:
+        top = (im.height - th) // 2
     im = im.crop((left, top, left + tw, top + th))
     flat = Image.new("RGB", size, (255, 255, 255))
     flat.paste(im, (0, 0), im)
@@ -117,6 +127,8 @@ def main():
     ap.add_argument("--banner", help="详情页横幅源图 → 750×400 JPG")
     ap.add_argument("--reward-guide", help="赞赏引导图源图 → 750×560 PNG")
     ap.add_argument("--reward-thanks", help="赞赏致谢图源图 → 750×750 PNG")
+    ap.add_argument("--anchor", choices=["top", "center", "bottom"], default="center",
+                    help="横幅/赞赏图的纵向裁切位置。竖构图素材用 top 才不会切掉顶部主体")
     args = ap.parse_args()
     out = args.out
     n = naming(args.copy)
@@ -154,15 +166,17 @@ def main():
     if args.banner:
         print("详情页横幅 750×400（不透明·避免文字）")
         name = f"详情页横幅-{n['album']}.jpg" if n else "banner_750x400.jpg"
-        save(cover_crop(Image.open(args.banner), (750, 400)), f"{out}/{name}", 500, jpeg=True)
+        save(cover_crop(Image.open(args.banner), (750, 400), anchor=args.anchor), f"{out}/{name}", 500, jpeg=True)
     if args.reward_guide:
         print("赞赏引导图 750×560（不透明）")
         name = f"赞赏引导图-{n['ip']}.png" if n else "reward-guide_750x560.png"
-        save(cover_crop(Image.open(args.reward_guide), (750, 560)).convert("RGB"), f"{out}/{name}", 500)
+        save(cover_crop(Image.open(args.reward_guide), (750, 560), anchor=args.anchor).convert("RGB"),
+             f"{out}/{name}", 500)
     if args.reward_thanks:
         print("赞赏致谢图 750×750（不透明）")
         name = f"赞赏致谢图-{n['ip']}.png" if n else "reward-thanks_750x750.png"
-        save(cover_crop(Image.open(args.reward_thanks), (750, 750)).convert("RGB"), f"{out}/{name}", 500)
+        save(cover_crop(Image.open(args.reward_thanks), (750, 750), anchor=args.anchor).convert("RGB"),
+             f"{out}/{name}", 500)
 
     print(f"\n切图完成，立刻机检：check_assets.py {out}")
 

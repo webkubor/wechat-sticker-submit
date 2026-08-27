@@ -13,8 +13,9 @@ metadata:
 **输入：一张 IP 正面照。输出：一个能直接往平台表单里填的目录。**
 零美术基础也能跑完 —— 出图、切图、校验、文案全部有脚本兜着，不需要打开 PS。
 
-本版只做**静态表情**（PNG）。动态 GIF 与视频号特效的规范已归档在 `references/specs.md`，
-但流水线不覆盖，别混着做：官方要求同一套专辑必须统一动/静。
+**静态表情**（PNG）走本文；**动态表情**（透明 GIF）的完整方案在 `references/animated.md`
+（1-bit 透明的取舍、图生视频→抽帧→逐帧抠图→合成的四步流水线、哪种 IP 适合做动图）。
+两者不能混在同一套专辑里 —— 官方要求同套统一动/静。视频号特效规范见 `references/specs.md` 第三节。
 
 ```
 SKILL_DIR=~/.claude/skills/wechat-sticker-submit
@@ -267,6 +268,7 @@ python3 $SKILL_DIR/scripts/fit_assets.py ~/Desktop/my-album \
 | `references/audit.md` | 官方审核标准全文 + 高频拒因清单 |
 | `references/ip-design.md` | IP 命名 / 简介 / 情绪选题 / 含义词写法（小白主要看这篇） |
 | `references/platform.md` | **平台地图**：真实 URL、登录方式、账号前置条件（路径猜不出来，别拼） |
+| `references/animated.md` | **动态表情**：透明 GIF 的 1-bit 约束、四步流水线、IP 适配判断 |
 | `references/pitfalls.md` | 开发本 skill 时踩过的坑：中文 bash 三坑、CLI 输出通道、图像机检误报 |
 | `templates/album.yml` | 文案模板，可被机检脚本解析 |
 | `scripts/ip.py` | **IP 库**：注册形象 / 完善进度 / 跨形象约束校验 / HTML 面板 / 备份到私有仓库 |
@@ -276,6 +278,7 @@ python3 $SKILL_DIR/scripts/fit_assets.py ~/Desktop/my-album \
 | `scripts/gen_album.sh` | 一张正面照 → 整套原图（museav 出图中台） |
 | `scripts/fit_assets.py` | 源图 → 合规尺寸素材（仅依赖 PIL） |
 | `scripts/check_assets.py` | 素材 + 文案机检，退出码 = FAIL 数 |
+| `scripts/make_gif.py` | 透明 PNG 序列 → 240×240 透明 GIF，自适应压到 500KB |
 | `scripts/make_submit.py` | 生成 `submit.md` 提交清单（字段 → 值/文件对照） |
 
 规范是动态文档，官方会改。数字以 `references/` 为准，若与平台当前页面冲突，**以平台页面为准**并回来更新本 skill。

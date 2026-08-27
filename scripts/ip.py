@@ -414,6 +414,68 @@ def cmd_update(args):
     return cmd_show(args)
 
 
+def cmd_rename(args):
+    """改形象名 —— 平台上的形象名才是真源，本地对不上就得改过来。
+    要动的地方比想象的多：库目录、ip.yml、形象头像/图标文件名、
+    系列根目录、每套系列里的封面/图标文件名、每份 album.yml 的 ip_name。
+    漏一处就会出现「文件名写着旧名、清单写着新名」这种半吊子状态。"""
+    old, new = args.old, args.new
+    meta = load(old)
+    if not meta:
+        print(f"❌ 没有形象「{old}」", file=sys.stderr)
+        return 1
+    errs = [e for e in check_name(new) if "已存在" not in e or new in all_ips()]
+    if new in all_ips():
+        print(f"❌ 「{new}」已存在，不能改成同名", file=sys.stderr)
+        return 1
+    if errs:
+        for e in errs:
+            print(f"❌ {e}", file=sys.stderr)
+        return 1
+
+    changed = []
+    # 1) 库目录内的文件名
+    d_old, d_new = ip_dir(old), ip_dir(new)
+    for f in os.listdir(d_old):
+        if old in f:
+            os.rename(os.path.join(d_old, f), os.path.join(d_old, f.replace(old, new)))
+            changed.append(f"{f} → {f.replace(old, new)}")
+    # 2) 库目录本身
+    os.rename(d_old, d_new)
+    changed.append(f"ips/{old}/ → ips/{new}/")
+    # 3) ip.yml 里的 name
+    meta["name"] = new
+    save(new, meta)
+    changed.append("ip.yml: name")
+
+    # 4) 系列根目录 + 每套系列里的素材名与 album.yml
+    a_old, a_new = os.path.join(ALBUMS, old), os.path.join(ALBUMS, new)
+    if os.path.isdir(a_old):
+        os.rename(a_old, a_new)
+        changed.append(f"{old}/ → {new}/（系列根目录）")
+        for sname in list_series(new):
+            sd = series_dir(new, sname)
+            for f in os.listdir(sd):
+                if old in f:
+                    os.rename(os.path.join(sd, f), os.path.join(sd, f.replace(old, new)))
+                    changed.append(f"{sname}/{f} → {f.replace(old, new)}")
+            copy_path = os.path.join(sd, "album.yml")
+            if os.path.exists(copy_path):
+                txt = open(copy_path, encoding="utf-8").read()
+                if f"ip_name: {old}" in txt:
+                    open(copy_path, "w", encoding="utf-8").write(
+                        txt.replace(f"ip_name: {old}", f"ip_name: {new}"))
+                    changed.append(f"{sname}/album.yml: ip_name")
+
+    print(f"✓ 「{old}」→「{new}」，共动了 {len(changed)} 处：")
+    for c in changed:
+        print(f"    {c}")
+    print("\n提交清单里带了文件名，记得重新生成：")
+    for sname in list_series(new):
+        print(f"    python3 make_submit.py {series_dir(new, sname)!r}")
+    return 0
+
+
 def cmd_page(args):
     """生成自包含 HTML 面板 —— 图片内嵌 base64，双击就能看，不依赖任何外链或服务。"""
     from page_tpl import CSS, render, thumb_b64
@@ -618,6 +680,11 @@ def main():
     up.add_argument("--rereverse", action="store_true", help="换图后重新读图出 prompt")
     up.add_argument("--add-source", help="把一个目录的原始画稿补进 IP 库的 source/")
     up.set_defaults(func=cmd_update)
+
+    rn = sub.add_parser("rename", help="改形象名（同步库目录/文件名/系列目录/album.yml）")
+    rn.add_argument("old")
+    rn.add_argument("new")
+    rn.set_defaults(func=cmd_rename)
 
     pg = sub.add_parser("page", help="生成 HTML 进度面板（自包含，双击可看）")
     pg.add_argument("--out", help="输出路径，默认 $STICKER_HOME/进度面板.html")
