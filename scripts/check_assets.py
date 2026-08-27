@@ -7,6 +7,7 @@
 判定分三级：FAIL(必须改) / WARN(人工确认) / OK。退出码 = FAIL 条数。
 """
 import argparse
+import glob
 import json
 import os
 import sys
@@ -225,12 +226,16 @@ def main():
     args = ap.parse_args()
     d, rep = args.dir, Report()
 
-    main_dir = os.path.join(d, "main_240")
-    mains = sorted(f for f in os.listdir(main_dir) if not f.startswith(".")) if os.path.isdir(main_dir) else []
+    # 兼容两套命名：中文（表情图/01-开心.png）与英文（main_240/01.png）
+    main_dir = next((p for p in (os.path.join(d, "表情图"), os.path.join(d, "main_240"))
+                     if os.path.isdir(p)), None)
+    mains = sorted(f for f in os.listdir(main_dir)
+                   if not f.startswith(".")) if main_dir else []
+    label = os.path.basename(main_dir) + "/" if main_dir else "表情图/"
     if not mains:
-        rep.fail("main_240/", "缺少表情图目录 main_240/")
+        rep.fail(label, "缺少表情图目录（表情图/ 或 main_240/）")
     elif not MAIN_MIN <= len(mains) <= MAIN_MAX:
-        rep.fail("main_240/", f"{len(mains)} 张，须为 {MAIN_MIN}~{MAIN_MAX} 张")
+        rep.fail(label, f"{len(mains)} 张，须为 {MAIN_MIN}~{MAIN_MAX} 张")
 
     hashes = {}
     for f in mains:
@@ -247,20 +252,20 @@ def main():
             elif dist < 11:
                 rep.warn(f"{a} vs {b}", f"构图偏接近（距离 {dist}/64）— 建议换姿势或视角，别只改表情细节")
 
-    for kind, cands in (
-        ("cover", ["cover_240.png"]),
-        ("icon", ["icon_50.png"]),
-        ("banner", ["banner_750x400.jpg", "banner_750x400.png"]),
-        ("reward_guide", ["reward-guide_750x560.png"]),
-        ("reward_thanks", ["reward-thanks_750x750.png"]),
+    for kind, desc, pats in (
+        ("cover", "表情封面图", ["封面图*.png", "cover_240.png"]),
+        ("icon", "聊天面板图标", ["聊天图标*.png", "icon_50.png"]),
+        ("banner", "详情页横幅", ["详情页横幅*.jpg", "详情页横幅*.png", "banner_750x400.*"]),
+        ("reward_guide", "赞赏引导图", ["赞赏引导图*.png", "reward-guide_750x560.png"]),
+        ("reward_thanks", "赞赏致谢图", ["赞赏致谢图*.png", "reward-thanks_750x750.png"]),
     ):
-        hit = next((c for c in cands if os.path.exists(os.path.join(d, c))), None)
+        hit = next((p for pat in pats for p in sorted(glob.glob(os.path.join(d, pat)))), None)
         if hit:
-            check_one(os.path.join(d, hit), kind, rep)
+            check_one(hit, kind, rep)
         elif kind.startswith("reward"):
-            rep.warn(cands[0], "缺失 — 仅开通赞赏时需要")
+            rep.warn(desc, "缺失 — 仅开通赞赏时需要")
         else:
-            rep.fail(cands[0], "必需素材缺失")
+            rep.fail(desc, "必需素材缺失")
 
     if args.copy:
         check_copy(args.copy if os.path.exists(args.copy) else os.path.join(d, args.copy), len(mains), rep)

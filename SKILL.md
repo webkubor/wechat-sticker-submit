@@ -122,18 +122,21 @@ python3 $SKILL_DIR/scripts/check_assets.py ~/Desktop/my-album --copy ~/Desktop/m
 python3 $SKILL_DIR/scripts/make_submit.py ~/Desktop/my-album   # new_album.sh 会自动跑
 ```
 
-素材目录长这样：
+素材按**形象名 + 含义词中文命名**，打开文件夹就知道哪张是哪张，不用对编号映射：
 
 ```
-my-album/
-├── main_240/01..09.png   表情图      240×240  ≤500KB  ← 按编号顺序传，含义词一一对应
-├── cover_240.png         封面图      240×240  ≤500KB  透明
-├── icon_50.png           聊天面板图标 50×50   ≤100KB  透明
-├── banner_750x400.jpg    详情页横幅   750×400 ≤500KB  不透明·无文字
-├── album.yml             文案（名称/介绍/版权/含义词）
-├── submit.md             提交清单 ← 照着这个填表
-└── raw/                  出图原件（不提交，留档用）
+团子日常/
+├── 表情图/01-开心.png … 08-无语.png   240×240  ≤500KB  ← 按编号顺序传
+├── 封面图-团子.png                    240×240  ≤500KB  透明
+├── 聊天图标-团子.png                   50×50   ≤100KB  透明
+├── 详情页横幅-团子日常.jpg              750×400 ≤500KB  不透明·无文字
+├── album.yml                         文案（名称/介绍/版权/含义词）
+├── submit.md                         提交清单 ← 照着这个填表
+└── raw/                              出图原件（不提交，留档用）
 ```
+
+不传 `--copy album.yml` 时退回英文命名（`main_240/01.png`、`cover_240.png`…），
+机检与清单脚本两套都认。
 
 **唯一不可逆的一步在这里**：作品挂到表情形象后，只有 **1 次**改到其他形象的机会
 （且要先从原形象删除再加到新形象）。挂之前把形象确认清楚 —— 形象合集是拿关联推荐流量的入口。
@@ -174,6 +177,7 @@ python3 $SKILL_DIR/scripts/fit_assets.py ~/Desktop/my-album \
 | `references/specs.md` | 官方制作规范全文（表情/形象/特效/艺术家/赞赏/付费）— **数字真源** |
 | `references/audit.md` | 官方审核标准全文 + 高频拒因清单 |
 | `references/ip-design.md` | IP 命名 / 简介 / 情绪选题 / 含义词写法（小白主要看这篇） |
+| `references/pitfalls.md` | 开发本 skill 时踩过的坑：中文 bash 三坑、CLI 输出通道、图像机检误报 |
 | `templates/album.yml` | 文案模板，可被机检脚本解析 |
 | `scripts/new_album.sh` | **一键入口**，幂等：文案 → 出图 → 切图 → 机检 → 清单 |
 | `scripts/gen_album.sh` | 一张正面照 → 整套原图（museav 出图中台） |

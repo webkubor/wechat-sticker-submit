@@ -68,13 +68,14 @@ if [[ "$HAVE" -lt 8 || "$FORCE_GEN" -eq 1 ]]; then
     ARGS=(--ip "$IP" --out "$DIR" --count "$COUNT")
     [[ -n "$EMOTIONS" ]] && ARGS+=(--emotions "$EMOTIONS")
     [[ -n "$STYLE" ]] && ARGS+=(--style "$STYLE")
+    [[ "$FORCE_GEN" -eq 1 ]] && ARGS+=(--regen)
     echo "▶ 用 museav 出图（约 $((COUNT * 50 / 3 + 60)) 秒）..."
     "$S/gen_album.sh" "${ARGS[@]}"
   else
     reason="没给 --ip"
     [[ -n "$IP" ]] && ! command -v museav >/dev/null && reason="本机没有 museav 出图 CLI"
     cat >&2 <<EOF
-⚠️  $RAW 里只有 $HAVE 张图，需要 $COUNT 张（$reason）。
+⚠️  $RAW 里只有 $HAVE 张图，需要 $COUNT 张（${reason}）。
 
 两条路，选一条：
   A. 自己画好/已有图 → 把 $COUNT 张原图放进 $RAW/（任意尺寸，命名随意，会按文件名排序）
@@ -90,8 +91,8 @@ FIRST=$(find "$RAW" -maxdepth 1 -type f \( -name '*.png' -o -name '*.jpg' -o -na
         ! -name 'banner-src.*' | sort | head -1)
 FIT=(--cover "$FIRST" --icon "$FIRST")
 [[ -f "$RAW/banner-src.png" ]] && FIT+=(--banner "$RAW/banner-src.png")
-echo "▶ 切图 → 240×240 / 50×50 / 750×400"
-python3 "$S/fit_assets.py" "$RAW" "$DIR" "${FIT[@]}"
+echo "▶ 切图 → 240×240 / 50×50 / 750×400（按形象名与含义词中文命名）"
+python3 "$S/fit_assets.py" "$RAW" "$DIR" --copy "$COPY" "${FIT[@]}"
 
 # ── 第 4 段：机检 ─────────────────────────────────────────────
 echo "▶ 机检"
