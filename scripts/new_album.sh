@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 # 一键跑完整套静态表情：填文案 → 出图 → 切图 → 机检 → 提交清单
 #
-#   new_album.sh ~/Desktop/团子日常 --ip 团子           # 用 IP 库里的形象（推荐）
-#   new_album.sh ~/Desktop/团子日常 --ip ~/Desktop/ip.png  # 直接给正面照（一次性）
-#   new_album.sh ~/Desktop/团子日常                      # 自己画好图放进 raw/ 也行
+#   new_album.sh --ip 团子 --series 日常     # 推荐：自动放到 <专辑根>/团子/01-日常/
+#   new_album.sh ~/Desktop/团子日常 --ip 团子  # 也可显式指定目录
+#   new_album.sh ~/Desktop/团子日常           # 自己画好图放进 raw/ 也行
+#
+# 微信的模型是「一个形象 → 多个系列」：形象配置唯一（在 IP 库里一份），
+# 系列可以有好几套。所以目录也按 <形象>/<序号-系列名>/ 分组，序号自动递增。
 #
 # --ip 给名字时从 IP 库取形象（正面照 + 读图 prompt + 形象名/简介都复用），
 # 一个 IP 出多套专辑就靠这个保持一致。注册形象：ip.py add <名称> <正面照>
@@ -13,10 +16,12 @@
 set -euo pipefail
 
 STICKER_HOME="${STICKER_HOME:-$HOME/.wechat-stickers}"
-DIR="" IP="" EMOTIONS="" STYLE="" FORCE_GEN=0 COVER_SRC="" ICON_SRC=""
+STICKER_ALBUMS="${STICKER_ALBUMS:-$HOME/Pictures/表情包系列}"
+DIR="" IP="" SERIES="" EMOTIONS="" STYLE="" FORCE_GEN=0 COVER_SRC="" ICON_SRC=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --ip) IP="$2"; shift 2 ;;
+    --series) SERIES="$2"; shift 2 ;;
     --cover-from) COVER_SRC="$2"; shift 2 ;;
     --icon-from) ICON_SRC="$2"; shift 2 ;;
     --emotions) EMOTIONS="$2"; shift 2 ;;
@@ -26,7 +31,25 @@ while [[ $# -gt 0 ]]; do
     *) DIR="$1"; shift ;;
   esac
 done
-[[ -n "$DIR" ]] || { echo "用法: new_album.sh <目录> [--ip <IP名或正面照>]" >&2; exit 2; }
+# 给了 --series 就自动推导目录：<专辑根>/<形象>/<下一个序号>-<系列名>
+if [[ -z "$DIR" && -n "$SERIES" ]]; then
+  if [[ -z "$IP" || -f "$IP" ]]; then
+    echo "⚠️  --series 要配合 --ip <已入库的形象名> 使用" >&2
+    exit 2
+  fi
+  BASE="$STICKER_ALBUMS/$IP"
+  mkdir -p "$BASE"
+  # 已存在同名系列就直接复用它（幂等：反复跑同一条命令不会新建一堆空目录）
+  EXIST=$(find "$BASE" -maxdepth 1 -type d -name "*-${SERIES}" | head -1)
+  if [[ -n "$EXIST" ]]; then
+    DIR="$EXIST"
+  else
+    NEXT=$(( $(find "$BASE" -maxdepth 1 -type d -name '[0-9][0-9]-*' | wc -l | tr -d ' ') + 1 ))
+    DIR="$BASE/$(printf %02d "$NEXT")-${SERIES}"
+  fi
+  echo "📁 系列目录：$DIR"
+fi
+[[ -n "$DIR" ]] || { echo "用法: new_album.sh --ip <形象名> --series <系列名>   或   new_album.sh <目录> [--ip ...]" >&2; exit 2; }
 
 S="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(dirname "$S")"

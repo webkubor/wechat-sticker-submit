@@ -20,25 +20,56 @@ metadata:
 SKILL_DIR=~/.claude/skills/wechat-sticker-submit
 ```
 
-## 最快路径：形象入库一次，之后每套专辑一条命令
+## 数据模型：形象唯一，系列多套
 
-```bash
-# 第一次：把形象存进 IP 库（一个形象只做这一次）
-python3 $SKILL_DIR/scripts/ip.py add 团子 ~/Desktop/正面照.png --desc "形象简介，≤80 字"
-python3 $SKILL_DIR/scripts/ip.py sync          # 备份到私有仓库，形象母版不可再生
+微信那边是两个独立配置，且是一对多：
 
-# 之后每套专辑：
-$SKILL_DIR/scripts/new_album.sh ~/Desktop/团子日常 --ip 团子
+```
+表情形象（唯一）              表情系列 / 专辑（多套）
+名称 · 简介 · 头像 · 图标  ──┬── 系列 A：表情图 8~24 张 + 封面 + 横幅 + 含义词
+                          ├── 系列 B：另一套，复用同一个形象
+                          └── 系列 C：...
 ```
 
-**这条命令是幂等的，卡住就修完再跑同一条。** 它的行为：
+所以本地也照这个分两处存，**按「能不能再生」决定备份策略**：
 
-1. 第一次跑 → 生成 `album.yml` 并停下，让你填文案（这是唯一需要人动脑的环节）
-2. 填完再跑 → 按含义词条数出图 → 切图 → 机检 → 生成 `submit.md`
-3. 机检有 FAIL → 打印「这条 FAIL 该怎么修」，修完再跑同一条命令
+```
+~/.wechat-stickers/ips/<形象>/          ← 形象配置 + 原始画稿，丢了画不回来 → git 备份
+├── ip.yml            名称/简介/系列清单/待办
+├── ip.png            正面照母版（出图垫图用，多套系列形象才不漂）
+├── ip-reverse.txt    读图 prompt（一个形象只读一次）
+├── 形象头像-<名>.png   240×240 透明
+├── 形象图标-<名>.png   50×50 透明
+└── source/           原始画稿池，多套系列都从这里挑图
 
-没有 `museav` 出图 CLI 也能用：自己画好 8~24 张放进 `my-album/raw/`（任意尺寸、命名随意，
-按文件名排序），不加 `--ip` 直接跑，从切图开始接管。
+~/Pictures/表情包系列/<形象>/<序号>-<系列名>/   ← 产物，有画稿+脚本就能重跑 → 不备份
+├── 表情图/01-开心.png … NN-xxx.png
+├── 封面图-<形象>.png · 聊天图标-<形象>.png · 详情页横幅-<系列>.jpg
+├── album.yml · submit.md
+└── raw/              切图前的中间件
+```
+
+两个根目录都可用环境变量覆盖：`STICKER_HOME`、`STICKER_ALBUMS`。
+
+## 最快路径
+
+```bash
+# 形象只建一次
+python3 $SKILL_DIR/scripts/ip.py add 团子 ~/Desktop/正面照.png --desc "简介，≤80 字" \
+    --source ~/Desktop/团子画稿          # 原始画稿一并收进库
+python3 $SKILL_DIR/scripts/ip.py sync    # 备份到私有仓库
+
+# 之后每出一套系列，一条命令（目录自动放对位置、序号自动递增）
+$SKILL_DIR/scripts/new_album.sh --ip 团子 --series 日常
+$SKILL_DIR/scripts/new_album.sh --ip 团子 --series 打工     # 第二套，自动变 02-打工
+
+# 随时看全局
+python3 $SKILL_DIR/scripts/ip.py list          # 每个形象几套系列、每套什么状态
+python3 $SKILL_DIR/scripts/ip.py show 团子      # 单个形象逐项核对
+```
+
+`new_album.sh` 幂等：同名系列反复跑会复用同一个目录，不会新建一堆空壳。
+第一次跑生成 `album.yml` 停下让你填文案，填完再跑同一条命令就继续往下走。
 
 下面是每一步在做什么、以及为什么这么定 —— 出问题时看这里。
 

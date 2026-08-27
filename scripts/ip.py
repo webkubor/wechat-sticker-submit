@@ -40,6 +40,9 @@ from PIL import Image  # noqa: E402
 
 HOME = os.path.expanduser(os.environ.get("STICKER_HOME", "~/.wechat-stickers"))
 IPS = os.path.join(HOME, "ips")
+# 系列（专辑）产物根目录。微信的模型是「一个形象 → 多个系列」，
+# 所以目录也按 <形象>/<序号-系列名>/ 分组，看文件夹就知道谁属于谁。
+ALBUMS = os.path.expanduser(os.environ.get("STICKER_ALBUMS", "~/Pictures/表情包系列"))
 PUNCT = "，。！？、；：“”‘’（）…—,.!?;:'\"()"
 
 
@@ -65,7 +68,8 @@ def save(name, data):
         if data.get(k):
             lines.append(f"{k}: {data[k]}")
     lines.append("")
-    lines.append("# 已挂到这个形象的专辑（一套作品只能挂一个形象，改归属只有 1 次机会）")
+    lines.append("# 这个形象下的系列（只存系列名，不存绝对路径，搬目录不断链）")
+    lines.append("# 官方规则：一套作品只能挂一个形象，改归属只有 1 次机会")
     lines.append("albums:")
     for a in data.get("albums", []):
         lines.append(f"  - {a}")
@@ -267,16 +271,19 @@ def cmd_list(_args):
     for n in ips:
         items, meta = progress(n)          # 与 show 用同一套判定，避免两处口径不一致
         done = sum(1 for s, _, _ in items if s == "ok")
-        albums = meta.get("albums", [])
+        on_disk = list_series(n)
         flag = "✅" if done == len(items) else "🚧"
         if done != len(items):
             pending += 1
-        print(f"  {flag} {n:<10} 完善 {done}/{len(items)}   专辑 {len(albums)} 套")
+        print(f"  {flag} {n:<8} 形象 {done}/{len(items)}   系列 {len(on_disk)} 套")
         if meta.get("desc"):
             print(f"      {meta['desc'][:44]}")
         for st, label, note in items:
             if st != "ok":
                 print(f"      ↳ {label}：{note}")
+        for sname in on_disk:
+            cnt, ready = series_state(n, sname)
+            print(f"      {'✅' if ready else '🚧'} {sname}（{cnt} 张{'' if ready else '，未就绪'}）")
     print("─" * 68)
     if pending:
         print(f"{pending} 个形象还没齐 —— ip.py show <名称> 看待办")
@@ -302,12 +309,19 @@ def cmd_show(args):
     for st, label, note in items:
         print(f"  {mark[st]} {label:<16} {note}")
 
-    albums = meta.get("albums", [])
-    print(f"\n  已挂专辑 {len(albums)} 套：")
-    for a in albums:
-        print(f"    · {a}{'' if os.path.exists(a) else '   ⚠️ 目录已不存在'}")
-    if not albums:
-        print("    （还没有；new_album.sh 跑完会自动记录）")
+    # 系列以磁盘为准，ip.yml 的记录只用来对账 —— 目录才是真相，记录会漂
+    on_disk = list_series(name)
+    recorded = meta.get("albums", [])
+    print(f"\n  系列 {len(on_disk)} 套    {os.path.join(ALBUMS, name)}")
+    for sname in on_disk:
+        cnt, ready = series_state(name, sname)
+        note = f"{cnt} 张，可提交" if ready else (f"{cnt} 张，未就绪（需 8~24 张且有 submit.md）" if cnt else "还没出图")
+        star = "" if sname in recorded else "   ⚠️ 未记入 ip.yml"
+        print(f"    {'✅' if ready else '🚧'} {sname:<16} {note}{star}")
+    for g in [r for r in recorded if r not in on_disk]:
+        print(f"    ❌ {g:<16} ip.yml 有记录，磁盘上没有")
+    if not on_disk:
+        print(f"    （还没有；new_album.sh --ip {name} --series <系列名> 出第一套）")
 
     todo = meta.get("todo", [])
     blockers = [f"{label}：{note}" for st, label, note in items if st != "ok"]
@@ -473,18 +487,44 @@ def cmd_sync(args):
     return 0
 
 
+def series_dir(ip, series):
+    return os.path.join(ALBUMS, ip, series)
+
+
+def list_series(ip):
+    """磁盘上这个形象有哪几套系列 —— 目录即真相，不依赖 ip.yml 里的记录。"""
+    d = os.path.join(ALBUMS, ip)
+    if not os.path.isdir(d):
+        return []
+    return sorted(x for x in os.listdir(d) if os.path.isdir(os.path.join(d, x)) and not x.startswith("."))
+
+
+def series_state(ip, series):
+    """一套系列的成色：表情图张数 + 提交清单在不在。"""
+    d = series_dir(ip, series)
+    pics = os.path.join(d, "表情图")
+    if not os.path.isdir(pics):
+        pics = os.path.join(d, "main_240")
+    n = len([f for f in os.listdir(pics) if not f.startswith(".")]) if os.path.isdir(pics) else 0
+    ready = os.path.exists(os.path.join(d, "submit.md")) and 8 <= n <= 24
+    return n, ready
+
+
 def cmd_link(args):
-    name, album = args.name, os.path.abspath(os.path.expanduser(args.album))
+    """记录系列归属。只存系列名（不存绝对路径）—— 整棵树搬走也不会断链。"""
+    name = args.name
     d = load(name)
     if not d:
         print(f"❌ 没有形象「{name}」", file=sys.stderr)
         return 1
+    p = os.path.abspath(os.path.expanduser(args.album))
+    series = os.path.basename(p.rstrip("/"))
     albums = d.get("albums", [])
-    if album not in albums:
-        albums.append(album)
+    if series not in albums:
+        albums.append(series)
         d["albums"] = albums
         save(name, d)
-        print(f"✓ 专辑已记入形象「{name}」（第 {len(albums)} 套）")
+        print(f"✓ 系列「{series}」已记入形象「{name}」（第 {len(albums)} 套）")
     return 0
 
 
