@@ -43,14 +43,24 @@ SKILL_DIR=~/.claude/skills/wechat-sticker-submit
 ├── 形象图标-<名>.png   50×50 透明
 └── source/           原始画稿池，多套系列都从这里挑图
 
-~/Pictures/表情包系列/<形象>/<序号>-<系列名>/   ← 产物，有画稿+脚本就能重跑 → 不备份
+~/.wechat-stickers/albums/<形象>/<序号>-<系列名>/   ← 产物，可再生 → 不进版本库
 ├── 表情图/01-开心.png … NN-xxx.png
 ├── 封面图-<形象>.png · 聊天图标-<形象>.png · 详情页横幅-<系列>.jpg
 ├── album.yml · submit.md
 └── raw/              切图前的中间件
+
+~/.wechat-stickers/outbox/                      ← 待上传中转，用完即弃
 ```
 
-两个根目录都可用环境变量覆盖：`STICKER_HOME`、`STICKER_ALBUMS`。
+**所有数据在一个根下**（`~/.wechat-stickers`），git 只版本化 `ips/` ——
+分层依据是「能不能再生」，不是「哪个更重要」。`~/Pictures/表情包系列` 是
+指向 `albums/` 的软链，Finder 里照样浏览。可用 `STICKER_HOME` / `STICKER_ALBUMS` 覆盖。
+
+**代码也只有一份**：这个 skill 目录本身就是 git 仓库
+（`github.com/webkubor/wechat-sticker-submit`），`~/dev/github/agent/wechat-sticker-submit`
+是指向它的软链。早先是两份副本靠手动 rsync 同步，结果漂了 8 个文件才发现。
+⚠️ Claude Code **不跟随 symlink 加载 skill**，所以真目录必须在 `~/.claude/skills/` 下，
+反过来做会导致 skill 直接消失。
 
 ## 最快路径
 

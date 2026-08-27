@@ -16,7 +16,7 @@
 set -euo pipefail
 
 STICKER_HOME="${STICKER_HOME:-$HOME/.wechat-stickers}"
-STICKER_ALBUMS="${STICKER_ALBUMS:-$HOME/Pictures/表情包系列}"
+STICKER_ALBUMS="${STICKER_ALBUMS:-$STICKER_HOME/albums}"
 DIR="" IP="" SERIES="" EMOTIONS="" STYLE="" FORCE_GEN=0 COVER_SRC="" ICON_SRC=""
 while [[ $# -gt 0 ]]; do
   case "$1" in

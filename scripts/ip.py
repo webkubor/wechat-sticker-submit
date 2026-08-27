@@ -40,9 +40,10 @@ from PIL import Image  # noqa: E402
 
 HOME = os.path.expanduser(os.environ.get("STICKER_HOME", "~/.wechat-stickers"))
 IPS = os.path.join(HOME, "ips")
-# 系列（专辑）产物根目录。微信的模型是「一个形象 → 多个系列」，
-# 所以目录也按 <形象>/<序号-系列名>/ 分组，看文件夹就知道谁属于谁。
-ALBUMS = os.path.expanduser(os.environ.get("STICKER_ALBUMS", "~/Pictures/表情包系列"))
+# 系列（专辑）产物根目录，默认就在库里（albums/）。
+# 微信的模型是「一个形象 → 多个系列」，所以按 <形象>/<序号-系列名>/ 分组，
+# 看文件夹就知道谁属于谁。albums/ 进了 .gitignore —— 产物可再生，不占版本库。
+ALBUMS = os.path.expanduser(os.environ.get("STICKER_ALBUMS", os.path.join(HOME, "albums")))
 PUNCT = "，。！？、；：“”‘’（）…—,.!?;:'\"()"
 
 
