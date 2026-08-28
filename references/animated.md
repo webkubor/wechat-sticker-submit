@@ -132,26 +132,46 @@ python3 scripts/make_gif.py <抠好的帧目录> <输出.gif> --fps 12
 
 ```bash
 scripts/make_promo.py <系列目录> \
-  --captions captions/caps-<系列>.txt \
   --footer "微信搜「<专辑名>」添加整套" \
-  --music bgm/mixkit-682-儿童轻快.mp3 \
+  --music ~/.wechat-stickers/bgm/mixkit-682-儿童轻快.mp3 \
   --sec 1.8            # 张数多时压缩每张停留，19 张 × 1.8s ≈ 34s
 ```
 
+文案的真源是 `album.yml` 的 `captions` 段，脚本自动读；`--captions <文件>` 只作临时覆盖。
+
 官方要求用秒剪 APP 手工做（导入素材 → 加标题 → 逐张加文字）。
-这个脚本走 ffmpeg 本地生成，好处是**改一个字重跑只要几秒**，多套系列不用重复劳动。
+本地生成的好处是**改一个字重跑只要几秒**，多套系列不用重复劳动。
 
-## 两个坑
+## 排版能力在 museav，不在这个脚本里
 
-**表情图别用 `thumbnail` 放大。** PIL 的 `thumbnail` 只缩小不放大 ——
-源图 240×240、目标上限设 660，它会原样贴上去，在 1080 宽的竖屏里只占两成宽，画面很空。
-要用 `resize`，目标 520px（约占画面 48%，对齐官方示例比例）。
+`make_promo.py` 只做表情包特有的部分：读 `album.yml` 取专辑名/形象名/文案，
+再按 `表情图/` 的目录约定拼出参数。真正出视频的是 **`museav slideshow`**（v2.9.0+）：
+
+```bash
+museav slideshow ./图片目录 --title "标题" --subtitle "副标题" \
+  --caption "第一张的文案" --caption "第二张的文案" \
+  --footer "引导语" --music bgm.mp3 --sec 2.2 --out 成片.mp4
+```
+
+这么分是因为「图集 + 文案 + 配乐 → 竖版视频」跟表情包没关系 ——
+产品图、作品集、日报都要用，放在表情包 skill 里等于把通用能力锁死在一个场景。
+要改版式、加主题、换尺寸，去改 museav 的 `src/local-slideshow.ts`，不要在这里重写一套。
+
+## 三个坑（已在 museav 里修掉，这里记着是为了别再踩）
+
+**小图必须显式放大，而且要先裁透明留白。** PIL 的 `thumbnail`、sharp 的
+`withoutEnlargement` 都只缩不放 —— 源图 240×240、目标上限设 660，它会原样贴上去，
+在 1080 宽的竖屏里只占两成宽。要显式 `resize` 到 520px（约占画面 48%，对齐官方示例比例）。
+另外贴纸四周常有大片透明留白，不先裁掉的话放大的是留白、主体照样小。
 
 **配乐别直接 `-shortest`。** 配乐通常比视频长几倍，硬切会在中途断掉。要裁到视频长度并淡出：
 
 ```
 -af "atrim=0:<总时长>,afade=t=in:st=0:d=1,afade=t=out:st=<总时长-1.5>:d=1.5"
 ```
+
+**concat demuxer 会忽略最后一项的 `duration`。** 末页一闪而过，
+只能把末页在 list 文件里多写一次。
 
 ## 配乐来源
 
