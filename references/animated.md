@@ -133,36 +133,47 @@ python3 scripts/make_gif.py <抠好的帧目录> <输出.gif> --fps 12
 ```bash
 scripts/make_promo.py <系列目录> \
   --footer "微信搜「<专辑名>」添加整套" \
-  --music ~/.wechat-stickers/bgm/mixkit-682-儿童轻快.mp3 \
   --sec 1.8            # 张数多时压缩每张停留，19 张 × 1.8s ≈ 34s
 ```
 
 文案的真源是 `album.yml` 的 `captions` 段，脚本自动读；`--captions <文件>` 只作临时覆盖。
+配乐默认走配乐库别名「儿童轻快」，`--music <别名|路径>` 换曲（`reel bgm` 看清单）。
 
 官方要求用秒剪 APP 手工做（导入素材 → 加标题 → 逐张加文字）。
 本地生成的好处是**改一个字重跑只要几秒**，多套系列不用重复劳动。
 
-## 排版能力在 museav，不在这个脚本里
+## 出片能力在 reel-kit，不在这个脚本里
 
 `make_promo.py` 只做表情包特有的部分：读 `album.yml` 取专辑名/形象名/文案，
-再按 `表情图/` 的目录约定拼出参数。真正出视频的是 **`museav slideshow`**（v2.9.0+）：
+按 `表情图/` 的目录约定拼参数。真正出片的是
+**[reel-kit](https://github.com/webkubor/reel-kit)** 的 `reel make`：
 
 ```bash
-museav slideshow ./图片目录 --title "标题" --subtitle "副标题" \
-  --caption "第一张的文案" --caption "第二张的文案" \
-  --footer "引导语" --music bgm.mp3 --sec 2.2 --out 成片.mp4
+reel make --template sticker-promo \
+  --assets ./表情图 --caps 文案.txt \
+  --title "莓啾日常" --subtitle "莓啾" --footer "引导语" \
+  --bgm 儿童轻快 --per-shot 2.5 --out 成片.mp4
 ```
 
-这么分是因为「图集 + 文案 + 配乐 → 竖版视频」跟表情包没关系 ——
-产品图、作品集、日报都要用，放在表情包 skill 里等于把通用能力锁死在一个场景。
-要改版式、加主题、换尺寸，去改 museav 的 `src/local-slideshow.ts`，不要在这里重写一套。
+前置：`cd ~/dev/github/devtool/reel-kit && pnpm install && npm link`（需 ffmpeg + Chrome）。
 
-## 三个坑（已在 museav 里修掉，这里记着是为了别再踩）
+**改版式去 reel-kit 的 `templates/*.html`** —— 丢一个 HTML 进去就是一个新版式，
+不用改代码。它还支持配音，且**镜头时长由念白长度决定**（`--voice`，走本地 voxcraft 零成本）。
 
-**小图必须显式放大，而且要先裁透明留白。** PIL 的 `thumbnail`、sharp 的
-`withoutEnlargement` 都只缩不放 —— 源图 240×240、目标上限设 660，它会原样贴上去，
-在 1080 宽的竖屏里只占两成宽。要显式 `resize` 到 520px（约占画面 48%，对齐官方示例比例）。
-另外贴纸四周常有大片透明留白，不先裁掉的话放大的是留白、主体照样小。
+> 2026-08-28 走过弯路：先在 museav-cli 里做了个 `slideshow` 命令，后来才发现
+> reel-kit 早就做了同一件事，而且 HTML/CSS 排版能换行、能做阴影渐变，SVG 那版做不到。
+> **museav slideshow 已下线**，能力收敛到 reel-kit 一处。
+> 教训：动手前先 `cs repo <关键词>` 搜一遍。
+
+## 四个坑（都已在 reel-kit 里修掉，这里记着是为了别再踩）
+
+**小图必须显式放大。** 三种实现踩的是同一个坑：PIL 的 `thumbnail`、sharp 的
+`withoutEnlargement`、CSS 的 `max-width` —— **全都只缩不放**。源图 240×240
+贴到 1080 宽的画布上会原样贴，在竖屏里只占一小块。CSS 里要用
+`width/height: 100%` + `object-fit: contain`，不是 `max-*`。
+
+**放大之后才会暴露间距问题。** 图片填满容器后下边缘会顶到文案 ——
+小图时本来就不满，看不出缺间距。容器底部要留够 padding。
 
 **配乐别直接 `-shortest`。** 配乐通常比视频长几倍，硬切会在中途断掉。要裁到视频长度并淡出：
 
@@ -170,12 +181,18 @@ museav slideshow ./图片目录 --title "标题" --subtitle "副标题" \
 -af "atrim=0:<总时长>,afade=t=in:st=0:d=1,afade=t=out:st=<总时长-1.5>:d=1.5"
 ```
 
-**concat demuxer 会忽略最后一项的 `duration`。** 末页一闪而过，
-只能把末页在 list 文件里多写一次。
+**concat demuxer 会忽略最后一项的 `duration`。** 末镜一闪而过，
+只能把末镜在 list 文件里多写一次。
 
 ## 配乐来源
 
-[Mixkit Free Stock Music](https://mixkit.co/free-stock-music/)：**免费、免署名、可商用、免登录**。
+配乐真源是 [`web-assets`](https://gitlab.com/webkubor/web-assets) 的
+`manifest/music.json` 的 `bgm` 段（本体在 R2，CDN `music.webkubor.online/bgm/`）。
+`reel bgm` 看清单，`--bgm <别名>` 取用，**出片时会打印授权** ——
+片子要对外发，能不能商用必须当场看得见。
+
+存量曲子来自 [Mixkit Free Stock Music](https://mixkit.co/free-stock-music/)：
+**免费、免署名、可商用、免登录**。
 
 直链规律：`https://assets.mixkit.co/music/<id>/<id>.mp3`
 

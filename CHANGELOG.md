@@ -1,5 +1,33 @@
 # Changelog
 
+## 1.2.0 (2026-08-28)
+
+### 出片改走 reel-kit（`museav slideshow` 已下线）
+
+1.1.1 刚把出片能力下沉到 museav-cli 的 `slideshow`，当天就发现
+**[reel-kit](https://github.com/webkubor/reel-kit) 早就做了同一件事，而且更好**：
+
+- 版式用 HTML/CSS —— 文字能换行、能做阴影渐变，SVG 那版做不到
+- 支持配音，且**镜头时长由念白长度决定**（念快的不干等，念慢的不被切）
+- 默认走本地 voxcraft TTS，批量出片零成本
+- 加版式 = 往 `templates/` 丢一个 HTML，不用改代码
+
+所以 museav 的 slideshow 下线，能力收敛到 reel-kit 一处。`make_promo.py` 接口没变
+（还是读 `album.yml` 拼参数），内部改调 `reel make --template sticker-promo`。
+
+用法上的变化：
+
+- `--music` 现在收**配乐库别名**（默认「儿童轻快」，`reel bgm` 看清单），也仍接受本地路径。
+  配乐真源是 web-assets 的 `manifest/music.json`，出片时会打印授权。
+- 新增 `--voice <音色>` 透传给 reel-kit 开配音；`--template` 换版式
+- 前置依赖从 museav 变成 reel-kit（`npm link` 一次）+ ffmpeg + Chrome
+
+迁移时顺手修了 reel-kit 的 `sticker-promo` 模板：`.stage img` 用的是 `max-width`，
+**只限上限不放大小图**，240×240 的表情在 900px 宽的舞台里只占一小块 ——
+跟 PIL 的 `thumbnail` 是同一个坑换成了 CSS 皮。
+
+教训写进了 `references/animated.md`：**动手前先 `cs repo <关键词>` 搜一遍**。
+
 ## 1.1.1 (2026-08-28)
 
 ### 出视频的能力下沉到 museav CLI

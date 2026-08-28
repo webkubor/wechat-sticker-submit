@@ -49,16 +49,23 @@
 一条命令把整套表情串成朋友圈 / 视频号能发的竖版视频，版式对齐官方秒剪模板：
 
 ```bash
-scripts/make_promo.py <系列目录> --music bgm.mp3 --sec 1.8
+scripts/make_promo.py <系列目录>                    # 配乐默认「儿童轻快」
+scripts/make_promo.py <系列目录> --sec 1.8          # 张数多时压缩每张停留
+scripts/make_promo.py <系列目录> --voice narrator   # 加配音，镜长由念白决定
 ```
 
 文案的真源是 `album.yml` 的 `captions` 段，写「什么时候发这张」而不是重复画面文字，
-传播力更强。配乐会自动裁到视频长度并加首尾淡入淡出（直接 `-shortest` 会在中途硬切断）。
-免费免署名的配乐来源与直链规律见 [`references/animated.md`](references/animated.md)。
+传播力更强。配乐走配乐库别名（`reel bgm` 看清单），出片时会打印授权。
 
-出视频的能力本身在 **`museav slideshow`**（museav-cli ≥ 2.9.0）里，
-这个脚本只负责读 `album.yml` 拼参数 —— 因为「图集 + 文案 + 配乐 → 竖版视频」
-跟表情包无关，别的场景一样要用，不该锁死在这个 skill 里。
+出视频的能力在 **[reel-kit](https://github.com/webkubor/reel-kit)**（`reel` 命令），
+这个脚本只负责读 `album.yml` 拼参数。要改版式就去改 reel-kit 的 `templates/*.html`，
+丢一个 HTML 进去就是一个新版式，不用改代码。
+
+> 前置：`cd ~/dev/github/devtool/reel-kit && pnpm install && npm link`（需 ffmpeg + Chrome）
+>
+> **`museav slideshow` 已下线**。2026-08-28 曾在 museav-cli 里做过一个，
+> 后来发现 reel-kit 早就做了同一件事且更好（HTML/CSS 排版能换行、支持配音驱动镜长、
+> 本地 TTS 零成本），已收敛到一处。
 
 ### 动态表情（透明 GIF）
 
@@ -250,7 +257,7 @@ $ ./scripts/lint.sh
 | `scripts/gen_album.sh` | 一张正面照 → 整套原图（含重试、限流退避、补差集） |
 | `scripts/restyle.py` | 照片型表情图 → 透明贴纸（先擦字再抠图，重绘统一文字） |
 | `scripts/make_gif.py` | 透明 PNG 序列 → 240×240 透明 GIF，自适应压到 500KB |
-| `scripts/make_promo.py` | 整套表情 → 1080×1920 竖版推广视频（读 `album.yml` → 调 `museav slideshow`） |
+| `scripts/make_promo.py` | 整套表情 → 1080×1920 竖版推广视频（读 `album.yml` → 调 `reel make`） |
 | `scripts/fit_assets.py` | 源图 → 合规尺寸素材（抠白底 / 去留白 / 居中 / 压体积 / `--anchor`） |
 | `scripts/check_assets.py` | 素材 + 文案机检，退出码 = FAIL 数 |
 | `scripts/make_submit.py` | 生成 `submit.md`：平台表单字段 → 值/文件对照表 |
