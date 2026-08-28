@@ -1,10 +1,10 @@
 ---
 name: wechat-sticker-submit
-description: 微信表情开放平台静态表情投稿全流程 SOP —— 一张 IP 正面照进，整套可提交素材出。覆盖 IP 命名与简介文案、9 情绪选题、museav 中台批量出图、240×240 表情图 / 750×400 详情页横幅 / 240×240 封面 / 50×50 聊天面板图标切图、透明背景与白描边机检、含义词字数校验、赞赏三件套、付费表情（10 微信豆）、审核红线与高频拒因。触发词：微信表情、表情包、表情专辑、表情投稿、提交表情、表情形象、微信表情开放平台、sticker、表情审核、含义词、赞赏引导图、付费表情、微信豆、表情封面、聊天面板图标。
+description: 微信表情开放平台静态表情投稿全流程 SOP —— 一张 IP 正面照进，整套可提交素材出。覆盖 IP 命名与简介文案、9 情绪选题、museav 中台批量出图、240×240 表情图 / 750×400 详情页横幅 / 240×240 封面 / 50×50 聊天面板图标切图、透明背景与白描边机检、含义词字数校验、赞赏三件套、付费表情（10 微信豆）、审核红线与高频拒因；上架后还能一条命令出 1080×1920 竖版推广视频（合成走 reel-kit）。触发词：微信表情、表情包、表情专辑、表情投稿、提交表情、表情形象、微信表情开放平台、sticker、表情审核、含义词、赞赏引导图、付费表情、微信豆、表情封面、聊天面板图标、表情推广视频、表情包宣传片、表情串成视频。
 metadata:
-  version: "1.2.0"
-  updated: "2026-08-27"
-  scope: "静态表情 + 动态表情（透明 GIF）；视频号特效仅归档规范，流水线不覆盖"
+  version: "1.3.0"
+  updated: "2026-08-28"
+  scope: "静态表情 + 动态表情（透明 GIF）+ 竖版推广视频（合成委托 reel-kit）；视频号特效仅归档规范，流水线不覆盖"
   source: "https://sticker.weixin.qq.com/cgi-bin/mmemoticon-bin/readtemplate?t=guide/index.html#/makingSpecifications"
 ---
 
@@ -93,6 +93,9 @@ $SKILL_DIR/scripts/new_album.sh --ip 团子 --series 打工     # 第二套，�
 python3 $SKILL_DIR/scripts/ip.py list          # 每个形象几套系列、每套什么状态
 python3 $SKILL_DIR/scripts/ip.py show 团子      # 单个形象逐项核对
 python3 $SKILL_DIR/scripts/ip.py page          # 生成 HTML 面板并打开（缩略图一览）
+
+# 上架后要发朋友圈/视频号（可选，见 Step 8）
+python3 $SKILL_DIR/scripts/make_promo.py <系列目录>
 ```
 
 `new_album.sh` 幂等：同名系列反复跑会复用同一个目录，不会新建一堆空壳。
@@ -263,6 +266,30 @@ python3 $SKILL_DIR/scripts/make_submit.py ~/Desktop/my-album   # new_album.sh �
 
 ---
 
+## Step 8 · 推广视频（可选，上架后发朋友圈 / 视频号）
+
+把整套表情串成 1080×1920 竖版视频，版式对齐官方秒剪模板：
+
+```bash
+python3 $SKILL_DIR/scripts/make_promo.py <系列目录>                   # 配乐默认「儿童轻快」
+python3 $SKILL_DIR/scripts/make_promo.py <系列目录> --sec 1.8         # 张数多时压缩每张停留
+python3 $SKILL_DIR/scripts/make_promo.py <系列目录> --voice narrator  # 加配音，镜长由念白决定
+```
+
+**文案真源是 `album.yml` 的 `captions` 段**，写「什么时候发这张」而不是重复画面文字，
+传播力更强。配乐传配乐库别名（`reel bgm` 看清单），出片时会打印授权。
+
+出视频的能力在 **[reel-kit](https://github.com/webkubor/reel-kit)**（`reel` 命令），
+`make_promo.py` 只负责读 `album.yml` 拼参数，不含合成逻辑。**要改版式去改 reel-kit 的
+`templates/*.html`** —— 丢一个 HTML 进去就是一个新版式，不用改本 skill 的代码。
+
+> 前置（首次）：`cd ~/dev/github/devtool/reel-kit && pnpm install && npm link`，另需 ffmpeg + Chrome。
+> 用 `--voice` 还需 voxcraft 已注册音色，见 reel-kit README。
+>
+> `museav slideshow` 已于 2026-08-28 下线，出片能力收敛到 reel-kit 一处，别再找 museav。
+
+---
+
 ## 变现（可选，有前置条件，别等提交时才发现）
 
 **赞赏**：需艺术家资料审核通过 + 绑定微信号/商户号 + 无违规，提交时要带引导语（5~15 字）、
@@ -305,5 +332,6 @@ python3 $SKILL_DIR/scripts/fit_assets.py ~/Desktop/my-album \
 | `scripts/check_assets.py` | 素材 + 文案机检，退出码 = FAIL 数 |
 | `scripts/make_gif.py` | 透明 PNG 序列 → 240×240 透明 GIF，自适应压到 500KB |
 | `scripts/make_submit.py` | 生成 `submit.md` 提交清单（字段 → 值/文件对照） |
+| `scripts/make_promo.py` | 整套表情 → 1080×1920 竖版推广视频；只拼参数，合成走 [reel-kit](https://github.com/webkubor/reel-kit) |
 
 规范是动态文档，官方会改。数字以 `references/` 为准，若与平台当前页面冲突，**以平台页面为准**并回来更新本 skill。

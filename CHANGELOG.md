@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.3.0 (2026-08-28)
+
+### 把 reel-kit 关联进主流程与触发词
+
+1.2.0 已经把出片能力换成 reel-kit，但只写在 README 和 CHANGELOG 里 ——
+**`SKILL.md` 一个字没提**。而 SKILL.md 才是 Claude Code 执行时读的文件，
+结果就是：能力做完了、文档也写了，agent 走流程时却根本不知道有推广视频这一步。
+
+补齐：
+
+- 新增 **Step 8 · 推广视频（可选）**，接在 Step 7 归档与通知之后：三条命令、
+  文案真源在 `album.yml` 的 `captions`、改版式去改 reel-kit 的 `templates/*.html`、
+  首次前置（`npm link` + ffmpeg + Chrome，`--voice` 还需 voxcraft 音色）。
+- 「最快路径」补一条 `make_promo.py`，文件索引补 `scripts/make_promo.py`。
+- frontmatter 的 `description` 与 `scope` 补上推广视频，新增触发词
+  「表情推广视频 / 表情包宣传片 / 表情串成视频」—— 之前说这几句话不会触发本 skill。
+- README 版本徽章从 1.1.0 补到当前版本（1.2.0 发版时漏更），加 reel-kit 徽章。
+
+没动脚本，`make_promo.py` 接口与行为不变。
+
 ## 1.2.0 (2026-08-28)
 
 ### 出片改走 reel-kit（`museav slideshow` 已下线）

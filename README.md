@@ -7,7 +7,8 @@
 [![静态 + 动态](https://img.shields.io/badge/%E9%9D%99%E6%80%81-%E5%B7%B2%E6%94%B6%E6%95%9B-2ea44f)](references/animated.md)
 [![官方规范同步](https://img.shields.io/badge/%E5%AE%98%E6%96%B9%E8%A7%84%E8%8C%83%E5%90%8C%E6%AD%A5-2026--08--27-orange)](https://sticker.weixin.qq.com/cgi-bin/mmemoticon-bin/readtemplate?t=guide/index.html#/makingSpecifications)
 [![Stars](https://img.shields.io/github/stars/webkubor/wechat-sticker-submit?style=flat&color=yellow)](https://github.com/webkubor/wechat-sticker-submit/stargazers)
-[![版本](https://img.shields.io/badge/version-1.1.0-blue)](CHANGELOG.md)
+[![出片: reel-kit](https://img.shields.io/badge/%E5%87%BA%E7%89%87-reel--kit-8b5cf6)](https://github.com/webkubor/reel-kit)
+[![版本](https://img.shields.io/badge/version-1.3.0-blue)](CHANGELOG.md)
 
 **一张 IP 正面照，出一整套能直接提交的微信表情素材。**
 
